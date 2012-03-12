@@ -20,7 +20,6 @@ import android.widget.*;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 import android.widget.AdapterView.OnItemClickListener;
 import com.fsck.k9.*;
-import com.fsck.k9.activity.setup.AccountSetupIndex;
 import com.fsck.k9.helper.SizeFormatter;
 import com.fsck.k9.activity.setup.AccountSettings;
 import com.fsck.k9.activity.setup.AccountSetupBasics;
@@ -368,7 +367,7 @@ public class Accounts extends K9ListActivity implements OnItemClickListener, OnC
     }
 
     private void onAddNewAccount() {
-        AccountSetupIndex.actionNewAccount(this);
+        AccountSetupBasics.actionNewAccount(this);
     }
 
     private void onEditAccount(Account account) {

@@ -2,6 +2,8 @@ package com.fsck.k9.view;
 
 import android.content.Context;
 import android.graphics.Typeface;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.style.StyleSpan;
@@ -10,7 +12,10 @@ import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.widget.CheckBox;
+import android.widget.ImageView;
+import android.widget.ScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -25,14 +30,14 @@ import com.fsck.k9.mail.Flag;
 import com.fsck.k9.mail.Message;
 import com.fsck.k9.mail.MessagingException;
 import com.fsck.k9.mail.internet.MimeUtility;
-import com.fsck.k9.mail.store.LocalStore;
-import java.util.HashSet;
+
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.text.DateFormat;
 
-public class MessageHeader extends LinearLayout {
+public class MessageHeader extends ScrollView implements OnClickListener {
     private Context mContext;
     private TextView mFromView;
     private TextView mDateView;
@@ -49,12 +54,15 @@ public class MessageHeader extends LinearLayout {
     private LinearLayout mToContainerView;
     private LinearLayout mCcContainerView;
     private TextView mAdditionalHeadersView;
-    private View mAttachmentIcon;
     private View mAnsweredIcon;
     private Message mMessage;
     private Account mAccount;
     private FontSizes mFontSizes = K9.getFontSizes();
     private Contacts mContacts;
+    private ImageView mShowAdditionalHeadersIcon;
+    private SavedState mSavedState;
+
+    private OnLayoutChangedListener mOnLayoutChangedListener;
 
     /**
      * Pair class is only available since API Level 5, so we need
@@ -79,7 +87,6 @@ public class MessageHeader extends LinearLayout {
     }
 
     private void initializeLayout() {
-        mAttachmentIcon = findViewById(R.id.attachment);
         mAnsweredIcon = findViewById(R.id.answered);
         mFromView = (TextView) findViewById(R.id.from);
         mToView = (TextView) findViewById(R.id.to);
@@ -92,55 +99,71 @@ public class MessageHeader extends LinearLayout {
         mDateView = (TextView) findViewById(R.id.date);
         mTimeView = (TextView) findViewById(R.id.time);
         mFlagged = (CheckBox) findViewById(R.id.flagged);
+        mShowAdditionalHeadersIcon = (ImageView) findViewById(R.id.show_additional_headers_icon);
 
         defaultSubjectColor = mSubjectView.getCurrentTextColor();
-        mSubjectView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, mFontSizes.getMessageViewSubject());
-        mTimeView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, mFontSizes.getMessageViewTime());
-        mDateView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, mFontSizes.getMessageViewDate());
-        mAdditionalHeadersView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, mFontSizes.getMessageViewAdditionalHeaders());
-        mAdditionalHeadersView.setVisibility(View.GONE);
-        mAttachmentIcon.setVisibility(View.GONE);
+        mSubjectView.setTextSize(TypedValue.COMPLEX_UNIT_SP, mFontSizes.getMessageViewSubject());
+        mTimeView.setTextSize(TypedValue.COMPLEX_UNIT_SP, mFontSizes.getMessageViewTime());
+        mDateView.setTextSize(TypedValue.COMPLEX_UNIT_SP, mFontSizes.getMessageViewDate());
+        mAdditionalHeadersView.setTextSize(TypedValue.COMPLEX_UNIT_SP, mFontSizes.getMessageViewAdditionalHeaders());
+        hideAdditionalHeaders();
+
         mAnsweredIcon.setVisibility(View.GONE);
-        mFromView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, mFontSizes.getMessageViewSender());
-        mToView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, mFontSizes.getMessageViewTo());
-        mCcView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, mFontSizes.getMessageViewCC());
-        ((TextView) findViewById(R.id.to_label)).setTextSize(TypedValue.COMPLEX_UNIT_DIP, mFontSizes.getMessageViewTo());
-        ((TextView) findViewById(R.id.cc_label)).setTextSize(TypedValue.COMPLEX_UNIT_DIP, mFontSizes.getMessageViewCC());
+        mFromView.setTextSize(TypedValue.COMPLEX_UNIT_SP, mFontSizes.getMessageViewSender());
+        mToView.setTextSize(TypedValue.COMPLEX_UNIT_SP, mFontSizes.getMessageViewTo());
+        mCcView.setTextSize(TypedValue.COMPLEX_UNIT_SP, mFontSizes.getMessageViewCC());
+        ((TextView) findViewById(R.id.to_label)).setTextSize(TypedValue.COMPLEX_UNIT_SP, mFontSizes.getMessageViewTo());
+        ((TextView) findViewById(R.id.cc_label)).setTextSize(TypedValue.COMPLEX_UNIT_SP, mFontSizes.getMessageViewCC());
 
-        setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
+        mFromView.setOnClickListener(this);
+        findViewById(R.id.top_container).setOnClickListener(this);
+
+        TextView dummyDateView = (TextView) findViewById(R.id.dummy_date);
+        TextView dummyTimeView = (TextView) findViewById(R.id.dummy_time);
+        dummyTimeView.setTextSize(TypedValue.COMPLEX_UNIT_SP, mFontSizes.getMessageViewTime());
+        dummyDateView.setTextSize(TypedValue.COMPLEX_UNIT_SP, mFontSizes.getMessageViewDate());
+    }
+
+    @Override
+    public void onClick(View view) {
+        switch (view.getId()) {
+            case R.id.top_container: {
                 onShowAdditionalHeaders();
-                return;
+                break;
             }
-        });
+            case R.id.from: {
+                onAddSenderToContacts();
+                break;
+            }
+            case R.id.to:
+            case R.id.cc: {
+                expand((TextView)view, ((TextView)view).getEllipsize() != null);
+                layoutChanged();
+            }
+        }
+    }
 
-        mFromView.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (mMessage != null) {
-                    try {
-                        final Address senderEmail = mMessage.getFrom()[0];
-                        mContacts.createContact(senderEmail);
-                    } catch (Exception e) {
-                        Log.e(K9.LOG_TAG, "Couldn't create contact", e);
-                    }
-                }
+    private void onAddSenderToContacts() {
+        if (mMessage != null) {
+            try {
+                final Address senderEmail = mMessage.getFrom()[0];
+                mContacts.createContact(senderEmail);
+            } catch (Exception e) {
+                Log.e(K9.LOG_TAG, "Couldn't create contact", e);
             }
-        });
+        }
     }
 
     public void setOnFlagListener(OnClickListener listener) {
+        if (mFlagged == null)
+            return;
         mFlagged.setOnClickListener(listener);
     }
 
 
     public boolean additionalHeadersVisible() {
-        if (mAdditionalHeadersView != null && mAdditionalHeadersView.getVisibility() == View.VISIBLE) {
-            return true;
-        } else {
-            return false;
-        }
+        return (mAdditionalHeadersView != null &&
+                mAdditionalHeadersView.getVisibility() == View.VISIBLE);
     }
 
     /**
@@ -150,7 +173,7 @@ public class MessageHeader extends LinearLayout {
     private void hideAdditionalHeaders() {
         mAdditionalHeadersView.setVisibility(View.GONE);
         mAdditionalHeadersView.setText("");
-
+        mShowAdditionalHeadersIcon.setImageResource(R.drawable.show_more);
     }
 
 
@@ -169,6 +192,7 @@ public class MessageHeader extends LinearLayout {
                 // Show the additional headers that we have got.
                 populateAdditionalHeadersView(additionalHeaders);
                 mAdditionalHeadersView.setVisibility(View.VISIBLE);
+                mShowAdditionalHeadersIcon.setImageResource(R.drawable.show_less);
             }
             if (!allHeadersDownloaded) {
                 /*
@@ -228,14 +252,23 @@ public class MessageHeader extends LinearLayout {
         mToView.setText(to);
         mCcContainerView.setVisibility((cc != null && cc.length() > 0) ? View.VISIBLE : View.GONE);
         mCcView.setText(cc);
-        mAttachmentIcon.setVisibility(((LocalStore.LocalMessage) message).hasAttachments() ? View.VISIBLE : View.GONE);
         mAnsweredIcon.setVisibility(message.isSet(Flag.ANSWERED) ? View.VISIBLE : View.GONE);
         mFlagged.setChecked(message.isSet(Flag.FLAGGED));
-        mChip.setBackgroundDrawable(mAccount.generateColorChip().drawable());
-        mChip.getBackground().setAlpha(!message.isSet(Flag.SEEN) ? 255 : 127);
+
+        int chipColor = mAccount.getChipColor();
+        int chipColorAlpha = (!message.isSet(Flag.SEEN)) ? 255 : 127;
+        mChip.setBackgroundColor(chipColor);
+        mChip.getBackground().setAlpha(chipColorAlpha);
+
         setVisibility(View.VISIBLE);
-        if (mAdditionalHeadersView.getVisibility() == View.VISIBLE) {
-            showAdditionalHeaders();
+
+        if (mSavedState != null) {
+            if (mSavedState.additionalHeadersVisible) {
+                showAdditionalHeaders();
+            }
+            mSavedState = null;
+        } else {
+            hideAdditionalHeaders();
         }
     }
 
@@ -243,9 +276,27 @@ public class MessageHeader extends LinearLayout {
         int currentVisibility = mAdditionalHeadersView.getVisibility();
         if (currentVisibility == View.VISIBLE) {
             hideAdditionalHeaders();
+            expand(mToView, false);
+            expand(mCcView, false);
         } else {
             showAdditionalHeaders();
+            expand(mToView, true);
+            expand(mCcView, true);
         }
+        layoutChanged();
+    }
+
+    /**
+     * Expand or collapse a TextView by removing or adding the 2 lines limitation
+     */
+    private void expand(TextView v, boolean expand) {
+       if (expand) {
+           v.setMaxLines(Integer.MAX_VALUE);
+           v.setEllipsize(null);
+       } else {
+           v.setMaxLines(2);
+           v.setEllipsize(android.text.TextUtils.TruncateAt.END);
+       }
     }
 
     private List<HeaderEntry> getAdditionalHeaders(final Message message)
@@ -256,7 +307,7 @@ public class MessageHeader extends LinearLayout {
         * message view header. But do show "From", "To", and "Cc" again.
         * This time including the email addresses. See issue 1805.
         */
-        Set<String> headerNames = new HashSet<String>(message.getHeaderNames());
+        Set<String> headerNames = new LinkedHashSet<String>(message.getHeaderNames());
         headerNames.remove("Subject");
         for (String headerName : headerNames) {
             String[] headerValues = message.getHeader(headerName);
@@ -295,4 +346,75 @@ public class MessageHeader extends LinearLayout {
         mAdditionalHeadersView.setText(sb);
     }
 
+    @Override
+    public Parcelable onSaveInstanceState() {
+        Parcelable superState = super.onSaveInstanceState();
+
+        SavedState savedState = new SavedState(superState);
+
+        savedState.additionalHeadersVisible = additionalHeadersVisible();
+
+        return savedState;
+    }
+
+    @Override
+    public void onRestoreInstanceState(Parcelable state) {
+        if(!(state instanceof SavedState)) {
+            super.onRestoreInstanceState(state);
+            return;
+        }
+
+        SavedState savedState = (SavedState)state;
+        super.onRestoreInstanceState(savedState.getSuperState());
+
+        mSavedState = savedState;
+    }
+
+    static class SavedState extends BaseSavedState {
+        boolean additionalHeadersVisible;
+
+        @SuppressWarnings("hiding")
+        public static final Parcelable.Creator<SavedState> CREATOR =
+                new Parcelable.Creator<SavedState>() {
+            @Override
+            public SavedState createFromParcel(Parcel in) {
+                return new SavedState(in);
+            }
+
+            @Override
+            public SavedState[] newArray(int size) {
+                return new SavedState[size];
+            }
+        };
+
+
+        SavedState(Parcelable superState) {
+            super(superState);
+        }
+
+        private SavedState(Parcel in) {
+            super(in);
+            this.additionalHeadersVisible = (in.readInt() != 0);
+        }
+
+        @Override
+        public void writeToParcel(Parcel out, int flags) {
+            super.writeToParcel(out, flags);
+            out.writeInt((this.additionalHeadersVisible) ? 1 : 0);
+        }
+    }
+
+    public interface OnLayoutChangedListener {
+        void onLayoutChanged();
+    }
+
+    public void setOnLayoutChangedListener(OnLayoutChangedListener listener) {
+        mOnLayoutChangedListener = listener;
+    }
+
+    private void layoutChanged() {
+        if (mOnLayoutChangedListener != null) {
+            mOnLayoutChangedListener.onLayoutChanged();
+        }
+    }
 }

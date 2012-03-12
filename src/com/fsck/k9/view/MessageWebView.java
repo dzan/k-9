@@ -5,15 +5,16 @@ import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.Toast;
 import com.fsck.k9.K9;
 import com.fsck.k9.R;
-
 import java.lang.reflect.Method;
 
 public class MessageWebView extends WebView {
+
 
     /**
      * We use WebSettings.getBlockNetworkLoads() to prevent the WebView that displays email
@@ -69,7 +70,7 @@ public class MessageWebView extends WebView {
         this.setVerticalScrollBarEnabled(true);
         this.setVerticalScrollbarOverlay(true);
         this.setScrollBarStyle(SCROLLBARS_INSIDE_OVERLAY);
-
+        this.setLongClickable(true);
 
         final WebSettings webSettings = this.getSettings();
 
@@ -85,18 +86,22 @@ public class MessageWebView extends WebView {
 
         // SINGLE_COLUMN layout was broken on Android < 2.2, so we
         // administratively disable it
-        if (
-            (Integer.parseInt(Build.VERSION.SDK)  > 7)
-            &&  K9.mobileOptimizedLayout()) {
+        if (Build.VERSION.SDK_INT > 7 && K9.mobileOptimizedLayout()) {
             webSettings.setLayoutAlgorithm(WebSettings.LayoutAlgorithm.SINGLE_COLUMN);
         } else {
             webSettings.setLayoutAlgorithm(WebSettings.LayoutAlgorithm.NARROW_COLUMNS);
         }
 
+        if (Integer.parseInt(Build.VERSION.SDK) >= 9 ) {
+            setOverScrollMode(OVER_SCROLL_NEVER);
+        }
+
+
         webSettings.setTextSize(K9.getFontSizes().getMessageViewContent());
 
-        // Disable network images by default.  This is overriden by preferences.
+        // Disable network images by default.  This is overridden by preferences.
         blockNetworkData(true);
+
     }
 
     /*
@@ -113,6 +118,18 @@ public class MessageWebView extends WebView {
             Toast.makeText(getContext() , R.string.select_text_now, Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Log.e(K9.LOG_TAG, "Exception in emulateShiftHeld()", e);
+        }
+    }
+
+    public void wrapSetTitleBar(final View title) {
+        try {
+            Class<?> webViewClass = Class.forName("android.webkit.WebView");
+            Method setEmbeddedTitleBar = webViewClass.getMethod("setEmbeddedTitleBar", View.class);
+            setEmbeddedTitleBar.invoke(this, title);
+        }
+
+        catch (Exception e) {
+            Log.v(K9.LOG_TAG, "failed to find the  setEmbeddedTitleBar method",e);
         }
     }
 }

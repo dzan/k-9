@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 
@@ -52,18 +53,19 @@ public class HtmlConverter {
      */
     private static class HtmlToTextTagHandler implements Html.TagHandler {
         // List of tags whose content should be ignored.
-        private static final Set<String> TAGS_WITH_IGNORED_CONTENT = Collections.unmodifiableSet(new HashSet<String>() {
-            {
-                add("style");
-                add("script");
-                add("title");
-                add("!");   // comments
-            }
-        });
+        private static final Set<String> TAGS_WITH_IGNORED_CONTENT;
+        static {
+            Set<String> set = new HashSet<String>();
+            set.add("style");
+            set.add("script");
+            set.add("title");
+            set.add("!");   // comments
+            TAGS_WITH_IGNORED_CONTENT = Collections.unmodifiableSet(set);
+        }
 
         @Override
         public void handleTag(boolean opening, String tag, Editable output, XMLReader xmlReader) {
-            tag = tag.toLowerCase();
+            tag = tag.toLowerCase(Locale.US);
             if (tag.equals("hr") && opening) {
                 // In the case of an <hr>, replace it with a bunch of underscores. This is roughly
                 // the behaviour of Outlook in Rich Text mode.
@@ -123,24 +125,95 @@ public class HtmlConverter {
 
     private static final int MAX_SMART_HTMLIFY_MESSAGE_LENGTH = 1024 * 256 ;
 
+    public static final String getHtmlHeader() {
+        return "<html><head/><body>";
+    }
+
+    public static final String getHtmlFooter() {
+        return "</body></html>";
+    }
+
     /**
-     * Convert a text string into an HTML document. Attempts to do smart replacement for large
-     * documents to prevent OOM errors. This method adds headers and footers to create a proper HTML
-     * document. To convert to a fragment, use {@link #textToHtmlFragment(String)}.
-     * @param text Plain text string.
+     * Naively convert a text string into an HTML document.
+     *
+     * <p>
+     * This method avoids using regular expressions on the entire message body to save memory.
+     * </p>
+     *
+     * @param text
+     *         Plain text string.
+     * @param useHtmlTag
+     *         If {@code true} this method adds headers and footers to create a proper HTML
+     *         document.
+     *
      * @return HTML string.
      */
-    public static String textToHtml(String text) {
+    private static String simpleTextToHtml(String text, boolean useHtmlTag) {
+        // Encode HTML entities to make sure we don't display something evil.
+        text = TextUtils.htmlEncode(text);
+
+        StringReader reader = new StringReader(text);
+        StringBuilder buff = new StringBuilder(text.length() + TEXT_TO_HTML_EXTRA_BUFFER_LENGTH);
+
+        if (useHtmlTag) {
+            buff.append(getHtmlHeader());
+        }
+
+        buff.append(htmlifyMessageHeader());
+
+        int c;
+        try {
+            while ((c = reader.read()) != -1) {
+                switch (c) {
+                case '\n':
+                    // pine treats <br> as two newlines, but <br/> as one newline.  Use <br/> so our messages aren't
+                    // doublespaced.
+                    buff.append("<br />");
+                    break;
+                case '\r':
+                    break;
+                default:
+                    buff.append((char)c);
+                }//switch
+            }
+        } catch (IOException e) {
+            //Should never happen
+            Log.e(K9.LOG_TAG, "Could not read string to convert text to HTML:", e);
+        }
+
+        buff.append(htmlifyMessageFooter());
+
+        if (useHtmlTag) {
+            buff.append(getHtmlFooter());
+        }
+
+        return buff.toString();
+    }
+
+    /**
+     * Convert a text string into an HTML document.
+     *
+     * <p>
+     * Attempts to do smart replacement for large documents to prevent OOM errors. This method
+     * optionally adds headers and footers to create a proper HTML document. To convert to a
+     * fragment, use {@link #textToHtmlFragment(String)}.
+     * </p>
+     *
+     * @param text
+     *         Plain text string.
+     * @param useHtmlTag
+     *         If {@code true} this method adds headers and footers to create a proper HTML
+     *         document.
+     *
+     * @return HTML string.
+     */
+    public static String textToHtml(String text, boolean useHtmlTag) {
         // Our HTMLification code is somewhat memory intensive
         // and was causing lots of OOM errors on the market
         // if the message is big and plain text, just do
         // a trivial htmlification
         if (text.length() > MAX_SMART_HTMLIFY_MESSAGE_LENGTH) {
-            return "<html><head/><body>" +
-                   htmlifyMessageHeader() +
-                   text +
-                   htmlifyMessageFooter() +
-                   "</body></html>";
+            return simpleTextToHtml(text, useHtmlTag);
         }
         StringReader reader = new StringReader(text);
         StringBuilder buff = new StringBuilder(text.length() + TEXT_TO_HTML_EXTRA_BUFFER_LENGTH);
@@ -148,6 +221,11 @@ public class HtmlConverter {
         try {
             while ((c = reader.read()) != -1) {
                 switch (c) {
+                case '\n':
+                    // pine treats <br> as two newlines, but <br/> as one newline.  Use <br/> so our messages aren't
+                    // doublespaced.
+                    buff.append("<br />");
+                    break;
                 case '&':
                     buff.append("&amp;");
                     break;
@@ -168,16 +246,30 @@ public class HtmlConverter {
             Log.e(K9.LOG_TAG, "Could not read string to convert text to HTML:", e);
         }
         text = buff.toString();
+
+        // Replace lines of -,= or _ with horizontal rules
         text = text.replaceAll("\\s*([-=_]{30,}+)\\s*", "<hr />");
+
+        // TODO: reverse engineer (or troll history) and document
         text = text.replaceAll("(?m)^([^\r\n]{4,}[\\s\\w,:;+/])(?:\r\n|\n|\r)(?=[a-z]\\S{0,10}[\\s\\n\\r])", "$1 ");
+
+        // Compress four or more newlines down to two newlines
         text = text.replaceAll("(?m)(\r\n|\n|\r){4,}", "\n\n");
 
         StringBuffer sb = new StringBuffer(text.length() + TEXT_TO_HTML_EXTRA_BUFFER_LENGTH);
-        sb.append("<html><head></head><body>");
+
+        if (useHtmlTag) {
+            sb.append(getHtmlHeader());
+        }
+
         sb.append(htmlifyMessageHeader());
         linkifyText(text, sb);
         sb.append(htmlifyMessageFooter());
-        sb.append("</body></html>");
+
+        if (useHtmlTag) {
+            sb.append(getHtmlFooter());
+        }
+
         text = sb.toString();
 
         return text;

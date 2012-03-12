@@ -1,19 +1,22 @@
 package com.fsck.k9.activity.setup;
 
+import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Vector;
+import java.util.List;
 
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.CheckBoxPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
-import android.view.KeyEvent;
+import android.preference.Preference.OnPreferenceClickListener;
 import android.widget.Toast;
 
 import com.fsck.k9.K9;
@@ -23,6 +26,8 @@ import com.fsck.k9.activity.Accounts;
 import com.fsck.k9.activity.ColorPickerDialog;
 import com.fsck.k9.activity.K9PreferenceActivity;
 import com.fsck.k9.helper.DateFormatter;
+import com.fsck.k9.helper.FileBrowserHelper;
+import com.fsck.k9.helper.FileBrowserHelper.FileBrowserFailOverCallback;
 import com.fsck.k9.preferences.CheckBoxListPreference;
 import com.fsck.k9.preferences.TimePickerPreference;
 
@@ -64,6 +69,7 @@ public class Prefs extends K9PreferenceActivity {
     private static final String PREFERENCE_COMPACT_LAYOUTS = "compact_layouts";
 
     private static final String PREFERENCE_MESSAGEVIEW_RETURN_TO_LIST = "messageview_return_to_list";
+    private static final String PREFERENCE_MESSAGEVIEW_SHOW_NEXT = "messageview_show_next";
     private static final String PREFERENCE_MESSAGEVIEW_ZOOM_CONTROLS_ENABLED = "messageview_zoom_controls";
     private static final String PREFERENCE_QUIET_TIME_ENABLED = "quiet_time_enabled";
     private static final String PREFERENCE_QUIET_TIME_STARTS = "quiet_time_starts";
@@ -76,7 +82,9 @@ public class Prefs extends K9PreferenceActivity {
     private static final String PREFERENCE_DEBUG_LOGGING = "debug_logging";
     private static final String PREFERENCE_SENSITIVE_LOGGING = "sensitive_logging";
 
+    private static final String PREFERENCE_ATTACHMENT_DEF_PATH = "attachment_default_path";
 
+    private static final int ACTIVITY_CHOOSE_FOLDER = 1;
     private ListPreference mLanguage;
     private ListPreference mTheme;
     private ListPreference mDateFormat;
@@ -99,6 +107,7 @@ public class Prefs extends K9PreferenceActivity {
     private CheckBoxPreference mChangeContactNameColor;
     private CheckBoxPreference mFixedWidth;
     private CheckBoxPreference mReturnToList;
+    private CheckBoxPreference mShowNext;
     private CheckBoxPreference mZoomControlsEnabled;
     private CheckBoxPreference mMobileOptimizedLayout;
     private ListPreference mBackgroundOps;
@@ -110,7 +119,7 @@ public class Prefs extends K9PreferenceActivity {
     private CheckBoxPreference mQuietTimeEnabled;
     private com.fsck.k9.preferences.TimePickerPreference mQuietTimeStarts;
     private com.fsck.k9.preferences.TimePickerPreference mQuietTimeEnds;
-
+    private Preference mAttachmentPathPreference;
 
 
     public static void actionPrefs(Context context) {
@@ -125,8 +134,8 @@ public class Prefs extends K9PreferenceActivity {
         addPreferencesFromResource(R.xml.global_preferences);
 
         mLanguage = (ListPreference) findPreference(PREFERENCE_LANGUAGE);
-        Vector<CharSequence> entryVector = new Vector<CharSequence>(Arrays.asList(mLanguage.getEntries()));
-        Vector<CharSequence> entryValueVector = new Vector<CharSequence>(Arrays.asList(mLanguage.getEntryValues()));
+        List<CharSequence> entryVector = new ArrayList<CharSequence>(Arrays.asList(mLanguage.getEntries()));
+        List<CharSequence> entryValueVector = new ArrayList<CharSequence>(Arrays.asList(mLanguage.getEntryValues()));
         String supportedLanguages[] = getResources().getStringArray(R.array.supported_languages);
         HashSet<String> supportedLanguageSet = new HashSet<String>(Arrays.asList(supportedLanguages));
         for (int i = entryVector.size() - 1; i > -1; --i) {
@@ -181,8 +190,18 @@ public class Prefs extends K9PreferenceActivity {
         mStartIntegratedInbox.setChecked(K9.startIntegratedInbox());
 
         mConfirmActions = (CheckBoxListPreference) findPreference(PREFERENCE_CONFIRM_ACTIONS);
-        mConfirmActions.setItems(new CharSequence[] {getString(R.string.global_settings_confirm_action_delete)});
-        mConfirmActions.setCheckedItems(new boolean[] {K9.confirmDelete()});
+        mConfirmActions.setItems(new CharSequence[] {
+                                     getString(R.string.global_settings_confirm_action_delete),
+                                     getString(R.string.global_settings_confirm_action_delete_starred),
+                                     getString(R.string.global_settings_confirm_action_spam),
+                                     getString(R.string.global_settings_confirm_action_mark_all_as_read)
+                                 });
+        mConfirmActions.setCheckedItems(new boolean[] {
+                                            K9.confirmDelete(),
+                                            K9.confirmDeleteStarred(),
+                                            K9.confirmSpam(),
+                                            K9.confirmMarkAllAsRead()
+                                        });
 
         mPrivacyMode = (CheckBoxPreference) findPreference(PREFERENCE_PRIVACY_MODE);
         mPrivacyMode.setChecked(K9.keyguardPrivacy());
@@ -241,11 +260,14 @@ public class Prefs extends K9PreferenceActivity {
         mReturnToList = (CheckBoxPreference) findPreference(PREFERENCE_MESSAGEVIEW_RETURN_TO_LIST);
         mReturnToList.setChecked(K9.messageViewReturnToList());
 
+        mShowNext = (CheckBoxPreference) findPreference(PREFERENCE_MESSAGEVIEW_SHOW_NEXT);
+        mShowNext.setChecked(K9.messageViewShowNext());
+
         mZoomControlsEnabled = (CheckBoxPreference) findPreference(PREFERENCE_MESSAGEVIEW_ZOOM_CONTROLS_ENABLED);
         mZoomControlsEnabled.setChecked(K9.zoomControlsEnabled());
 
         mMobileOptimizedLayout = (CheckBoxPreference) findPreference(PREFERENCE_MESSAGEVIEW_MOBILE_LAYOUT);
-        if (Integer.parseInt(Build.VERSION.SDK)  <= 7) {
+        if (Build.VERSION.SDK_INT <= 7) {
             mMobileOptimizedLayout.setEnabled(false);
         }
 
@@ -290,6 +312,36 @@ public class Prefs extends K9PreferenceActivity {
 
         mDebugLogging.setChecked(K9.DEBUG);
         mSensitiveLogging.setChecked(K9.DEBUG_SENSITIVE);
+
+        mAttachmentPathPreference = findPreference(PREFERENCE_ATTACHMENT_DEF_PATH);
+        mAttachmentPathPreference.setSummary(K9.getAttachmentDefaultPath());
+        mAttachmentPathPreference
+        .setOnPreferenceClickListener(new OnPreferenceClickListener() {
+            @Override
+            public boolean onPreferenceClick(Preference preference) {
+                FileBrowserHelper
+                .getInstance()
+                .showFileBrowserActivity(Prefs.this,
+                                         new File(K9.getAttachmentDefaultPath()),
+                                         ACTIVITY_CHOOSE_FOLDER, callback);
+
+                return true;
+            }
+
+            FileBrowserFailOverCallback callback = new FileBrowserFailOverCallback() {
+
+                @Override
+                public void onPathEntered(String path) {
+                    mAttachmentPathPreference.setSummary(path);
+                    K9.setAttachmentDefaultPath(path);
+                }
+
+                @Override
+                public void onCancel() {
+                    // canceled, do nothing
+                }
+            };
+        });
     }
 
     private void saveSettings() {
@@ -305,6 +357,9 @@ public class Prefs extends K9PreferenceActivity {
         K9.setManageBack(mManageBack.isChecked());
         K9.setStartIntegratedInbox(!mHideSpecialAccounts.isChecked() && mStartIntegratedInbox.isChecked());
         K9.setConfirmDelete(mConfirmActions.getCheckedItems()[0]);
+        K9.setConfirmDeleteStarred(mConfirmActions.getCheckedItems()[1]);
+        K9.setConfirmSpam(mConfirmActions.getCheckedItems()[2]);
+        K9.setConfirmMarkAllAsRead(mConfirmActions.getCheckedItems()[3]);
         K9.setKeyguardPrivacy(mPrivacyMode.isChecked());
         K9.setMeasureAccounts(mMeasureAccounts.isChecked());
         K9.setCountSearchMessages(mCountSearch.isChecked());
@@ -318,6 +373,7 @@ public class Prefs extends K9PreferenceActivity {
         K9.setChangeContactNameColor(mChangeContactNameColor.isChecked());
         K9.setMessageViewFixedWidthFont(mFixedWidth.isChecked());
         K9.setMessageViewReturnToList(mReturnToList.isChecked());
+        K9.setMessageViewShowNext(mShowNext.isChecked());
         K9.setMobileOptimizedLayout(mMobileOptimizedLayout.isChecked());
         K9.setQuietTimeEnabled(mQuietTimeEnabled.isChecked());
 
@@ -326,7 +382,7 @@ public class Prefs extends K9PreferenceActivity {
 
 
         K9.setZoomControlsEnabled(mZoomControlsEnabled.isChecked());
-
+        K9.setAttachmentDefaultPath(mAttachmentPathPreference.getSummary().toString());
         boolean needsRefresh = K9.setBackgroundOps(mBackgroundOps.getValue());
         K9.setUseGalleryBugWorkaround(mUseGalleryBugWorkaround.isChecked());
 
@@ -347,16 +403,19 @@ public class Prefs extends K9PreferenceActivity {
     }
 
     @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            saveSettings();
-            if (K9.manageBack()) {
-                Accounts.listAccounts(this);
-                finish();
-                return true;
-            }
+    protected void onPause() {
+        saveSettings();
+        super.onPause();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (K9.manageBack()) {
+            Accounts.listAccounts(this);
+            finish();
+        } else {
+            super.onBackPressed();
         }
-        return super.onKeyDown(keyCode, event);
     }
 
     private void onFontSizeSettings() {
@@ -370,5 +429,26 @@ public class Prefs extends K9PreferenceActivity {
             }
         },
         K9.getContactNameColor()).show();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        switch (requestCode) {
+        case ACTIVITY_CHOOSE_FOLDER:
+            if (resultCode == RESULT_OK && data != null) {
+                // obtain the filename
+                Uri fileUri = data.getData();
+                if (fileUri != null) {
+                    String filePath = fileUri.getPath();
+                    if (filePath != null) {
+                        mAttachmentPathPreference.setSummary(filePath.toString());
+                        K9.setAttachmentDefaultPath(filePath.toString());
+                    }
+                }
+            }
+            break;
+        }
+
+        super.onActivityResult(requestCode, resultCode, data);
     }
 }

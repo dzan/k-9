@@ -18,7 +18,6 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import com.fsck.k9.*;
 import com.fsck.k9.activity.K9Activity;
-import com.fsck.k9.helper.Contacts;
 import com.fsck.k9.helper.Utility;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
@@ -134,17 +133,11 @@ public class AccountSetupBasics extends K9Activity
     private String getOwnerName() {
         String name = null;
         try {
-            name = Contacts.getInstance(this).getOwnerName();
+            name = getDefaultAccountName();
         } catch (Exception e) {
-            Log.e(K9.LOG_TAG, "Could not get owner name, using default account name", e);
+            Log.e(K9.LOG_TAG, "Could not get default account name", e);
         }
-        if (name == null || name.length() == 0) {
-            try {
-                name = getDefaultAccountName();
-            } catch (Exception e) {
-                Log.e(K9.LOG_TAG, "Could not get default account name", e);
-            }
-        }
+
         if (name == null) {
             name = "";
         }
@@ -232,8 +225,18 @@ public class AccountSetupBasics extends K9Activity
             mAccount.setDraftsFolderName(getString(R.string.special_mailbox_name_drafts));
             mAccount.setTrashFolderName(getString(R.string.special_mailbox_name_trash));
             mAccount.setArchiveFolderName(getString(R.string.special_mailbox_name_archive));
-            mAccount.setSpamFolderName(getString(R.string.special_mailbox_name_spam));
+            // Yahoo! has a special folder for Spam, called "Bulk Mail".
+            if (incomingUriTemplate.getHost().toLowerCase().endsWith(".yahoo.com")) {
+                mAccount.setSpamFolderName("Bulk Mail");
+            } else {
+                mAccount.setSpamFolderName(getString(R.string.special_mailbox_name_spam));
+            }
             mAccount.setSentFolderName(getString(R.string.special_mailbox_name_sent));
+            if (incomingUri.toString().startsWith("imap")) {
+                mAccount.setDeletePolicy(Account.DELETE_POLICY_ON_DELETE);
+            } else if (incomingUri.toString().startsWith("pop3")) {
+                mAccount.setDeletePolicy(Account.DELETE_POLICY_NEVER);
+            }
             AccountSetupCheckSettings.actionCheckSettings(this, mAccount, true, true);
         } catch (UnsupportedEncodingException enc) {
             // This really shouldn't happen since the encoding is hardcoded to UTF-8
@@ -247,7 +250,6 @@ public class AccountSetupBasics extends K9Activity
         }
     }
 
-    @Override
     protected void onNext() {
         String email = mEmailView.getText().toString();
         String[] emailParts = splitEmail(email);
@@ -313,6 +315,13 @@ public class AccountSetupBasics extends K9Activity
         mAccount.setDraftsFolderName(getString(R.string.special_mailbox_name_drafts));
         mAccount.setTrashFolderName(getString(R.string.special_mailbox_name_trash));
         mAccount.setSentFolderName(getString(R.string.special_mailbox_name_sent));
+        mAccount.setArchiveFolderName(getString(R.string.special_mailbox_name_archive));
+        // Yahoo! has a special folder for Spam, called "Bulk Mail".
+        if (domain.endsWith(".yahoo.com")) {
+            mAccount.setSpamFolderName("Bulk Mail");
+        } else {
+            mAccount.setSpamFolderName(getString(R.string.special_mailbox_name_spam));
+        }
 
         AccountSetupAccountType.actionSelectAccountType(this, mAccount, mDefaultView.isChecked());
         finish();

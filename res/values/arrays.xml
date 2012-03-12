@@ -112,6 +112,9 @@
         <item>@string/account_settings_autodownload_message_size_512</item>
         <item>@string/account_settings_autodownload_message_size_1024</item>
         <item>@string/account_settings_autodownload_message_size_2048</item>
+        <item>@string/account_settings_autodownload_message_size_5120</item>
+        <item>@string/account_settings_autodownload_message_size_10240</item>
+        <item>@string/account_settings_autodownload_message_size_any</item>
     </string-array>
 
     <string-array name="account_settings_autodownload_message_size_values">
@@ -127,6 +130,9 @@
         <item>524288</item>
         <item>1048576</item>
         <item>2097152</item>
+        <item>5242880</item>
+        <item>10485760</item>
+        <item>0</item>
     </string-array>
 
     <string-array name="account_settings_folder_display_mode_entries">
@@ -141,30 +147,6 @@
         <item>FIRST_CLASS</item>
         <item>FIRST_AND_SECOND_CLASS</item>
         <item>NOT_SECOND_CLASS</item>
-    </string-array>
-
-    <string-array name="account_settings_hide_buttons_entries">
-        <item>@string/account_settings_hide_buttons_never</item>
-        <item>@string/account_settings_hide_buttons_keyboard_avail</item>
-        <item>@string/account_settings_hide_buttons_always</item>
-    </string-array>
-
-    <string-array name="account_settings_hide_buttons_values">
-        <item>NEVER</item>
-        <item>KEYBOARD_AVAILABLE</item>
-        <item>ALWAYS</item>
-    </string-array>
-
-    <string-array name="account_settings_hide_move_buttons_entries">
-        <item>@string/account_settings_hide_buttons_never</item>
-        <item>@string/account_settings_hide_buttons_keyboard_avail</item>
-        <item>@string/account_settings_hide_buttons_always</item>
-    </string-array>
-
-    <string-array name="account_settings_hide_move_buttons_values">
-        <item>NEVER</item>
-        <item>KEYBOARD_AVAILABLE</item>
-        <item>ALWAYS</item>
     </string-array>
 
     <string-array name="account_settings_show_pictures_entries">
@@ -485,6 +467,7 @@
         <item></item>
         <item>ca</item>
         <item>cs</item>
+        <item>da</item>
         <item>de</item>
         <item>en</item>
         <item>es</item>
@@ -493,14 +476,17 @@
         <item>gl</item>
         <item>it</item>
         <item>ja</item>
+        <item>hu</item>
         <item>nl</item>
         <item>pl</item>
         <item>pt_BR</item>
         <item>ru</item>
+        <item>tr</item>
         <item>zh_TW</item>
         <item>zh_CN</item>
         <item>fi</item>
         <item>sv</item>
+        <item>ko</item>
     </string-array>
 
     <string-array name="settings_theme_entries">
@@ -668,11 +654,13 @@
     <string-array name="account_settings_message_format_entries">
         <item>@string/account_settings_message_format_text</item>
         <item>@string/account_settings_message_format_html</item>
+        <item>@string/account_settings_message_format_auto</item>
     </string-array>
 
     <string-array name="account_settings_message_format_values">
         <item>TEXT</item>
         <item>HTML</item>
+        <item>AUTO</item>
     </string-array>
 
 </resources>

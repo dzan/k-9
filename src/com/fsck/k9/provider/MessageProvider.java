@@ -1,18 +1,5 @@
 package com.fsck.k9.provider;
 
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import android.content.ContentProvider;
 import android.content.ContentResolver;
 import android.content.ContentValues;
@@ -46,6 +33,19 @@ import com.fsck.k9.mail.Message;
 import com.fsck.k9.mail.MessagingException;
 import com.fsck.k9.mail.store.LocalStore;
 
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public class MessageProvider extends ContentProvider {
 
     public static interface MessageColumns extends BaseColumns {
@@ -64,12 +64,22 @@ public class MessageProvider extends ContentProvider {
         /**
          * <P>Type: TEXT</P>
          */
+        String SENDER_ADDRESS = "senderAddress";
+
+        /**
+         * <P>Type: TEXT</P>
+         */
         String SUBJECT = "subject";
 
         /**
          * <P>Type: TEXT</P>
          */
         String PREVIEW = "preview";
+
+        /**
+         * <P>Type: BOOLEAN</P>
+         */
+        String UNREAD = "unread";
 
         String ACCOUNT = "account";
         String URI = "uri";
@@ -174,10 +184,23 @@ public class MessageProvider extends ContentProvider {
             return source.sender;
         }
     }
+    public static class SenderAddressExtractor implements FieldExtractor<MessageInfoHolder, String> {
+        @Override
+        public String getField(final MessageInfoHolder source) {
+            return source.senderAddress;
+        }
+    }
     public static class AccountExtractor implements FieldExtractor<MessageInfoHolder, String> {
         @Override
         public String getField(final MessageInfoHolder source) {
             return source.message.getFolder().getAccount().getDescription();
+        }
+    }
+
+    public static class UnreadExtractor implements FieldExtractor<MessageInfoHolder, Boolean> {
+        @Override
+        public Boolean getField(final MessageInfoHolder source) {
+            return Boolean.valueOf(!source.read); // avoid autoboxing
         }
     }
 
@@ -222,7 +245,7 @@ public class MessageProvider extends ContentProvider {
             final BlockingQueue<List<MessageInfoHolder>> queue = new SynchronousQueue<List<MessageInfoHolder>>();
 
             // new code for integrated inbox, only execute this once as it will be processed afterwards via the listener
-            final SearchAccount integratedInboxAccount = new SearchAccount(getContext(), true, null, null);
+            final SearchAccount integratedInboxAccount = SearchAccount.createUnifiedInboxAccount(getContext());
             final MessagingController msgController = MessagingController.getInstance(K9.app);
 
             msgController.searchLocalMessages(integratedInboxAccount, null,
@@ -278,6 +301,8 @@ public class MessageProvider extends ContentProvider {
                     extractors.put(field, new SubjectExtractor());
                 } else if (MessageColumns.SENDER.equals(field)) {
                     extractors.put(field, new SenderExtractor());
+                } else if (MessageColumns.SENDER_ADDRESS.equals(field)) {
+                    extractors.put(field, new SenderAddressExtractor());
                 } else if (MessageColumns.SEND_DATE.equals(field)) {
                     extractors.put(field, new SendDateExtractor());
                 } else if (MessageColumns.PREVIEW.equals(field)) {
@@ -288,6 +313,8 @@ public class MessageProvider extends ContentProvider {
                     extractors.put(field, new DeleteUriExtractor());
                 } else if (MessageColumns.ACCOUNT.equals(field)) {
                     extractors.put(field, new AccountExtractor());
+                } else if (MessageColumns.UNREAD.equals(field)) {
+                    extractors.put(field, new UnreadExtractor());
                 } else if (MessageColumns.INCREMENT.equals(field)) {
                     extractors.put(field, new IncrementExtractor());
                 }
@@ -687,6 +714,12 @@ public class MessageProvider extends ContentProvider {
             checkClosed();
             mCursor.unregisterDataSetObserver(observer);
         }
+
+        @Override
+        public int getType(int columnIndex) {
+            checkClosed();
+            return mCursor.getType(columnIndex);
+        }
     }
 
     protected class ThrottlingQueryHandler implements QueryHandler {
@@ -804,7 +837,8 @@ public class MessageProvider extends ContentProvider {
         MessageColumns.PREVIEW,
         MessageColumns.ACCOUNT,
         MessageColumns.URI,
-        MessageColumns.DELETE_URI
+        MessageColumns.DELETE_URI,
+        MessageColumns.SENDER_ADDRESS
     };
 
     /**
@@ -865,7 +899,7 @@ public class MessageProvider extends ContentProvider {
             Log.v(K9.LOG_TAG, "MessageProvider/delete: " + uri);
         }
 
-        // Nota : can only delete a message
+        // Note: can only delete a message
 
         List<String> segments = null;
         int accountId = -1;

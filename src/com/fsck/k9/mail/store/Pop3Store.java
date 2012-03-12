@@ -24,79 +24,232 @@ import java.util.LinkedList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 public class Pop3Store extends Store {
+    public static final String STORE_TYPE = "POP3";
+
     public static final int CONNECTION_SECURITY_NONE = 0;
     public static final int CONNECTION_SECURITY_TLS_OPTIONAL = 1;
     public static final int CONNECTION_SECURITY_TLS_REQUIRED = 2;
     public static final int CONNECTION_SECURITY_SSL_REQUIRED = 3;
     public static final int CONNECTION_SECURITY_SSL_OPTIONAL = 4;
 
+    private enum AuthType {
+        PLAIN,
+        CRAM_MD5
+    }
+
+    private static final String STLS_COMMAND = "STLS";
+    private static final String USER_COMMAND = "USER";
+    private static final String PASS_COMMAND = "PASS";
+    private static final String CAPA_COMMAND = "CAPA";
+    private static final String STAT_COMMAND = "STAT";
+    private static final String LIST_COMMAND = "LIST";
+    private static final String UIDL_COMMAND = "UIDL";
+    private static final String TOP_COMMAND = "TOP";
+    private static final String RETR_COMMAND = "RETR";
+    private static final String DELE_COMMAND = "DELE";
+    private static final String QUIT_COMMAND = "QUIT";
+
+    private static final String STLS_CAPABILITY = "STLS";
+    private static final String UIDL_CAPABILITY = "UIDL";
+    private static final String PIPELINING_CAPABILITY = "PIPELINING";
+    private static final String USER_CAPABILITY = "USER";
+    private static final String TOP_CAPABILITY = "TOP";
+
     private static final Flag[] PERMANENT_FLAGS = { Flag.DELETED };
 
-    private String mHost;
-    private int mPort;
-    private String mUsername;
-    private String mPassword;
-    private int mConnectionSecurity;
-    private HashMap<String, Folder> mFolders = new HashMap<String, Folder>();
-    private Pop3Capabilities mCapabilities;
-
     /**
+     * Decodes a Pop3Store URI.
+     *
+     * <p>Possible forms:</p>
+     * <pre>
      * pop3://user:password@server:port CONNECTION_SECURITY_NONE
      * pop3+tls://user:password@server:port CONNECTION_SECURITY_TLS_OPTIONAL
      * pop3+tls+://user:password@server:port CONNECTION_SECURITY_TLS_REQUIRED
      * pop3+ssl+://user:password@server:port CONNECTION_SECURITY_SSL_REQUIRED
      * pop3+ssl://user:password@server:port CONNECTION_SECURITY_SSL_OPTIONAL
+     * </pre>
      */
-    public Pop3Store(Account account) throws MessagingException {
-        super(account);
+    public static ServerSettings decodeUri(String uri) {
+        String host;
+        int port;
+        ConnectionSecurity connectionSecurity;
+        String username = null;
+        String password = null;
 
-        URI uri;
+        URI pop3Uri;
         try {
-            uri = new URI(mAccount.getStoreUri());
+            pop3Uri = new URI(uri);
         } catch (URISyntaxException use) {
-            throw new MessagingException("Invalid Pop3Store URI", use);
+            throw new IllegalArgumentException("Invalid Pop3Store URI", use);
         }
 
-        String scheme = uri.getScheme();
+        String scheme = pop3Uri.getScheme();
         if (scheme.equals("pop3")) {
-            mConnectionSecurity = CONNECTION_SECURITY_NONE;
-            mPort = 110;
+            connectionSecurity = ConnectionSecurity.NONE;
+            port = 110;
         } else if (scheme.equals("pop3+tls")) {
-            mConnectionSecurity = CONNECTION_SECURITY_TLS_OPTIONAL;
-            mPort = 110;
+            connectionSecurity = ConnectionSecurity.STARTTLS_OPTIONAL;
+            port = 110;
         } else if (scheme.equals("pop3+tls+")) {
-            mConnectionSecurity = CONNECTION_SECURITY_TLS_REQUIRED;
-            mPort = 110;
+            connectionSecurity = ConnectionSecurity.STARTTLS_REQUIRED;
+            port = 110;
         } else if (scheme.equals("pop3+ssl+")) {
-            mConnectionSecurity = CONNECTION_SECURITY_SSL_REQUIRED;
-            mPort = 995;
+            connectionSecurity = ConnectionSecurity.SSL_TLS_REQUIRED;
+            port = 995;
         } else if (scheme.equals("pop3+ssl")) {
-            mConnectionSecurity = CONNECTION_SECURITY_SSL_OPTIONAL;
-            mPort = 995;
+            connectionSecurity = ConnectionSecurity.SSL_TLS_OPTIONAL;
+            port = 995;
         } else {
-            throw new MessagingException("Unsupported protocol");
+            throw new IllegalArgumentException("Unsupported protocol (" + scheme + ")");
         }
 
-        mHost = uri.getHost();
+        host = pop3Uri.getHost();
 
-        if (uri.getPort() != -1) {
-            mPort = uri.getPort();
+        if (pop3Uri.getPort() != -1) {
+            port = pop3Uri.getPort();
         }
 
-        if (uri.getUserInfo() != null) {
+        String authType = AuthType.PLAIN.name();
+        if (pop3Uri.getUserInfo() != null) {
             try {
-                String[] userInfoParts = uri.getUserInfo().split(":");
-                mUsername = URLDecoder.decode(userInfoParts[0], "UTF-8");
-                if (userInfoParts.length > 1) {
-                    mPassword = URLDecoder.decode(userInfoParts[1], "UTF-8");
+                int userIndex = 0, passwordIndex = 1;
+                String userinfo = pop3Uri.getUserInfo();
+                String[] userInfoParts = userinfo.split(":");
+                if (userInfoParts.length > 2 || userinfo.endsWith(":") ) {
+                    // If 'userinfo' ends with ":" the password is empty. This can only happen
+                    // after an account was imported (so authType and username are present).
+                    userIndex++;
+                    passwordIndex++;
+                    authType = userInfoParts[0];
+                }
+                username = URLDecoder.decode(userInfoParts[userIndex], "UTF-8");
+                if (userInfoParts.length > passwordIndex) {
+                    password = URLDecoder.decode(userInfoParts[passwordIndex], "UTF-8");
                 }
             } catch (UnsupportedEncodingException enc) {
                 // This shouldn't happen since the encoding is hardcoded to UTF-8
-                Log.e(K9.LOG_TAG, "Couldn't urldecode username or password.", enc);
+                throw new IllegalArgumentException("Couldn't urldecode username or password.", enc);
             }
         }
+
+        return new ServerSettings(STORE_TYPE, host, port, connectionSecurity, authType, username,
+                password);
+    }
+
+    /**
+     * Creates a Pop3Store URI with the supplied settings.
+     *
+     * @param server
+     *         The {@link ServerSettings} object that holds the server settings.
+     *
+     * @return A Pop3Store URI that holds the same information as the {@code server} parameter.
+     *
+     * @see Account#getStoreUri()
+     * @see Pop3Store#decodeUri(String)
+     */
+    public static String createUri(ServerSettings server) {
+        String userEnc;
+        String passwordEnc;
+        try {
+            userEnc = URLEncoder.encode(server.username, "UTF-8");
+            passwordEnc = (server.password != null) ?
+                    URLEncoder.encode(server.password, "UTF-8") : "";
+        }
+        catch (UnsupportedEncodingException e) {
+            throw new IllegalArgumentException("Could not encode username or password", e);
+        }
+
+        String scheme;
+        switch (server.connectionSecurity) {
+            case SSL_TLS_OPTIONAL:
+                scheme = "pop3+ssl";
+                break;
+            case SSL_TLS_REQUIRED:
+                scheme = "pop3+ssl+";
+                break;
+            case STARTTLS_OPTIONAL:
+                scheme = "pop3+tls";
+                break;
+            case STARTTLS_REQUIRED:
+                scheme = "pop3+tls+";
+                break;
+            default:
+            case NONE:
+                scheme = "pop3";
+                break;
+        }
+
+        try {
+            AuthType.valueOf(server.authenticationType);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid authentication type (" +
+                    server.authenticationType + ")");
+        }
+
+        String userInfo = server.authenticationType + ":" + userEnc + ":" + passwordEnc;
+        try {
+            return new URI(scheme, userInfo, server.host, server.port, null, null,
+                    null).toString();
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Can't create Pop3Store URI", e);
+        }
+    }
+
+
+    private String mHost;
+    private int mPort;
+    private String mUsername;
+    private String mPassword;
+    private AuthType mAuthType;
+    private int mConnectionSecurity;
+    private HashMap<String, Folder> mFolders = new HashMap<String, Folder>();
+    private Pop3Capabilities mCapabilities;
+
+    /**
+     * This value is {@code true} if the server supports the CAPA command but doesn't advertise
+     * support for the TOP command OR if the server doesn't support the CAPA command and we
+     * already unsuccessfully tried to use the TOP command.
+     */
+    private boolean mTopNotSupported;
+
+
+    public Pop3Store(Account account) throws MessagingException {
+        super(account);
+
+        ServerSettings settings;
+        try {
+            settings = decodeUri(mAccount.getStoreUri());
+        } catch (IllegalArgumentException e) {
+            throw new MessagingException("Error while decoding store URI", e);
+        }
+
+        mHost = settings.host;
+        mPort = settings.port;
+
+        switch (settings.connectionSecurity) {
+        case NONE:
+            mConnectionSecurity = CONNECTION_SECURITY_NONE;
+            break;
+        case STARTTLS_OPTIONAL:
+            mConnectionSecurity = CONNECTION_SECURITY_TLS_OPTIONAL;
+            break;
+        case STARTTLS_REQUIRED:
+            mConnectionSecurity = CONNECTION_SECURITY_TLS_REQUIRED;
+            break;
+        case SSL_TLS_OPTIONAL:
+            mConnectionSecurity = CONNECTION_SECURITY_SSL_OPTIONAL;
+            break;
+        case SSL_TLS_REQUIRED:
+            mConnectionSecurity = CONNECTION_SECURITY_SSL_REQUIRED;
+            break;
+        }
+
+        mUsername = settings.username;
+        mPassword = settings.password;
+        mAuthType = AuthType.valueOf(settings.authenticationType);
     }
 
     @Override
@@ -112,13 +265,13 @@ public class Pop3Store extends Store {
     @Override
     public List <? extends Folder > getPersonalNamespaces(boolean forceListAll) throws MessagingException {
         List<Folder> folders = new LinkedList<Folder>();
-        folders.add(getFolder("INBOX"));
+        folders.add(getFolder(mAccount.getInboxFolderName()));
         return folders;
     }
 
     @Override
     public void checkSettings() throws MessagingException {
-        Pop3Folder folder = new Pop3Folder("INBOX");
+        Pop3Folder folder = new Pop3Folder(mAccount.getInboxFolderName());
         folder.open(OpenMode.READ_WRITE);
         if (!mCapabilities.uidl) {
             /*
@@ -130,7 +283,7 @@ public class Pop3Store extends Store {
              * If the server doesn't support UIDL it will return a - response, which causes
              * executeSimpleCommand to throw a MessagingException, exiting this method.
              */
-            folder.executeSimpleCommand("UIDL");
+            folder.executeSimpleCommand(UIDL_COMMAND);
 
         }
         folder.close();
@@ -149,8 +302,9 @@ public class Pop3Store extends Store {
         public Pop3Folder(String name) {
             super(Pop3Store.this.mAccount);
             this.mName = name;
-            if (mName.equalsIgnoreCase("INBOX")) {
-                mName = "INBOX";
+
+            if (mName.equalsIgnoreCase(mAccount.getInboxFolderName())) {
+                mName = mAccount.getInboxFolderName();
             }
         }
 
@@ -160,7 +314,7 @@ public class Pop3Store extends Store {
                 return;
             }
 
-            if (!mName.equalsIgnoreCase("INBOX")) {
+            if (!mName.equalsIgnoreCase(mAccount.getInboxFolderName())) {
                 throw new MessagingException("Folder does not exist");
             }
 
@@ -195,7 +349,7 @@ public class Pop3Store extends Store {
                     mCapabilities = getCapabilities();
 
                     if (mCapabilities.stls) {
-                        writeLine("STLS");
+                        writeLine(STLS_COMMAND);
 
                         SSLContext sslContext = SSLContext.getInstance("TLS");
                         boolean secure = mConnectionSecurity == CONNECTION_SECURITY_TLS_REQUIRED;
@@ -215,11 +369,23 @@ public class Pop3Store extends Store {
                     }
                 }
 
-                try {
-                    executeSimpleCommand("USER " + mUsername);
-                    executeSimpleCommand("PASS " + mPassword, true);
-                } catch (MessagingException me) {
-                    throw new AuthenticationFailedException(null, me);
+                if (mAuthType == AuthType.CRAM_MD5) {
+                    try {
+                        String b64Nonce = executeSimpleCommand("AUTH CRAM-MD5").replace("+ ", "");
+
+                        String b64CRAM = Authentication.computeCramMd5(mUsername, mPassword, b64Nonce);
+                        executeSimpleCommand(b64CRAM);
+
+                    } catch (MessagingException me) {
+                        throw new AuthenticationFailedException(null, me);
+                    }
+                } else {
+                    try {
+                        executeSimpleCommand(USER_COMMAND + " " + mUsername);
+                        executeSimpleCommand(PASS_COMMAND + " " + mPassword, true);
+                    } catch (MessagingException me) {
+                        throw new AuthenticationFailedException(null, me);
+                    }
                 }
 
                 mCapabilities = getCapabilities();
@@ -232,7 +398,7 @@ public class Pop3Store extends Store {
                 throw new MessagingException("Unable to open connection to POP server.", ioe);
             }
 
-            String response = executeSimpleCommand("STAT");
+            String response = executeSimpleCommand(STAT_COMMAND);
             String[] parts = response.split(" ");
             mMessageCount = Integer.parseInt(parts[1]);
 
@@ -255,7 +421,9 @@ public class Pop3Store extends Store {
         @Override
         public void close() {
             try {
-                executeSimpleCommand("QUIT");
+                if (isOpen()) {
+                    executeSimpleCommand(QUIT_COMMAND);
+                }
             } catch (Exception e) {
                 /*
                  * QUIT may fail if the connection is already closed. We don't care. It's just
@@ -305,7 +473,7 @@ public class Pop3Store extends Store {
 
         @Override
         public boolean exists() throws MessagingException {
-            return mName.equalsIgnoreCase("INBOX");
+            return mName.equalsIgnoreCase(mAccount.getInboxFolderName());
         }
 
         @Override
@@ -395,7 +563,7 @@ public class Pop3Store extends Store {
                 for (int msgNum = start; msgNum <= end; msgNum++) {
                     Pop3Message message = mMsgNumToMsgMap.get(msgNum);
                     if (message == null) {
-                        String response = executeSimpleCommand("UIDL " + msgNum);
+                        String response = executeSimpleCommand(UIDL_COMMAND + " " + msgNum);
                         int uidIndex = response.lastIndexOf(' ');
                         String msgUid = response.substring(uidIndex + 1);
                         message = new Pop3Message(msgUid, this);
@@ -403,12 +571,24 @@ public class Pop3Store extends Store {
                     }
                 }
             } else {
-                String response = executeSimpleCommand("UIDL");
+                String response = executeSimpleCommand(UIDL_COMMAND);
                 while ((response = readLine()) != null) {
                     if (response.equals(".")) {
                         break;
                     }
-                    String[] uidParts = response.split(" ");
+
+                    /*
+                     * Yet another work-around for buggy server software:
+                     * split the response into message number and unique identifier, no matter how many spaces it has
+                     *
+                     * Example for a malformed response:
+                     * 1   2011071307115510400ae3e9e00bmu9
+                     *
+                     * Note the three spaces between message number and unique identifier.
+                     * See issue 3546
+                     */
+
+                    String[] uidParts = response.split(" +");
                     if ((uidParts.length >= 3) && "+OK".equals(uidParts[0])) {
                         /*
                          * At least one server software places a "+OK" in
@@ -446,7 +626,7 @@ public class Pop3Store extends Store {
                     unindexedUids.add(uid);
                 }
             }
-            if (unindexedUids.size() == 0) {
+            if (unindexedUids.isEmpty()) {
                 return;
             }
             /*
@@ -454,7 +634,7 @@ public class Pop3Store extends Store {
              * get them is to do a full UIDL list. A possible optimization
              * would be trying UIDL for the latest X messages and praying.
              */
-            String response = executeSimpleCommand("UIDL");
+            String response = executeSimpleCommand(UIDL_COMMAND);
             while ((response = readLine()) != null) {
                 if (response.equals(".")) {
                     break;
@@ -552,8 +732,12 @@ public class Pop3Store extends Store {
                          * To convert the suggested download size we take the size
                          * divided by the maximum line size (76).
                          */
-                        fetchBody(pop3Message,
-                                  (mAccount.getMaximumAutoDownloadMessageSize() / 76));
+                        if (mAccount.getMaximumAutoDownloadMessageSize() > 0) {
+                            fetchBody(pop3Message,
+                                      (mAccount.getMaximumAutoDownloadMessageSize() / 76));
+                        } else {
+                            fetchBody(pop3Message, -1);
+                        }
                     } else if (fp.contains(FetchProfile.Item.STRUCTURE)) {
                         /*
                          * If the user is requesting STRUCTURE we are required to set the body
@@ -595,7 +779,7 @@ public class Pop3Store extends Store {
                     if (listener != null) {
                         listener.messageStarted(pop3Message.getUid(), i, count);
                     }
-                    String response = executeSimpleCommand(String.format("LIST %d",
+                    String response = executeSimpleCommand(String.format(LIST_COMMAND + " %d",
                                                            mUidToMsgNumMap.get(pop3Message.getUid())));
                     String[] listParts = response.split(" ");
                     //int msgNum = Integer.parseInt(listParts[1]);
@@ -611,7 +795,7 @@ public class Pop3Store extends Store {
                     msgUidIndex.add(message.getUid());
                 }
                 int i = 0, count = messages.length;
-                String response = executeSimpleCommand("LIST");
+                String response = executeSimpleCommand(LIST_COMMAND);
                 while ((response = readLine()) != null) {
                     if (response.equals(".")) {
                         break;
@@ -635,41 +819,67 @@ public class Pop3Store extends Store {
         }
 
         /**
-         * Fetches the body of the given message, limiting the stored data
-         * to the specified number of lines. If lines is -1 the entire message
-         * is fetched. This is implemented with RETR for lines = -1 or TOP
-         * for any other value. If the server does not support TOP it is
-         * emulated with RETR and extra lines are thrown away.
-         * @param message
-         * @param lines
+         * Fetches the body of the given message, limiting the downloaded data to the specified
+         * number of lines if possible.
+         *
+         * If lines is -1 the entire message is fetched. This is implemented with RETR for
+         * lines = -1 or TOP for any other value. If the server does not support TOP, RETR is used
+         * instead.
          */
         private void fetchBody(Pop3Message message, int lines)
         throws IOException, MessagingException {
             String response = null;
-            if (lines == -1 || !mCapabilities.top) {
-                response = executeSimpleCommand(String.format("RETR %d",
-                                                mUidToMsgNumMap.get(message.getUid())));
-            } else {
-                response = executeSimpleCommand(String.format("TOP %d %d",
-                                                mUidToMsgNumMap.get(message.getUid()),
-                                                lines));
-            }
-            if (response != null) {
+
+            // Try hard to use the TOP command if we're not asked to download the whole message.
+            if (lines != -1 && (!mTopNotSupported || mCapabilities.top)) {
                 try {
-                    message.parse(new Pop3ResponseInputStream(mIn));
-                    if (lines == -1 || !mCapabilities.top) {
-                        message.setFlag(Flag.X_DOWNLOADED_FULL, true);
+                    if (K9.DEBUG && K9.DEBUG_PROTOCOL_POP3 && !mCapabilities.top) {
+                        Log.d(K9.LOG_TAG, "This server doesn't support the CAPA command. " +
+                              "Checking to see if the TOP command is supported nevertheless.");
                     }
-                } catch (MessagingException me) {
-                    /*
-                     * If we're only downloading headers it's possible
-                     * we'll get a broken MIME message which we're not
-                     * real worried about. If we've downloaded the body
-                     * and can't parse it we need to let the user know.
-                     */
-                    if (lines == -1) {
-                        throw me;
+
+                    response = executeSimpleCommand(String.format(TOP_COMMAND + " %d %d",
+                                                    mUidToMsgNumMap.get(message.getUid()), lines));
+
+                    // TOP command is supported. Remember this for the next time.
+                    mCapabilities.top = true;
+                } catch (Pop3ErrorResponse e) {
+                    if (mCapabilities.top) {
+                        // The TOP command should be supported but something went wrong.
+                        throw e;
+                    } else {
+                        if (K9.DEBUG && K9.DEBUG_PROTOCOL_POP3) {
+                            Log.d(K9.LOG_TAG, "The server really doesn't support the TOP " +
+                                  "command. Using RETR instead.");
+                        }
+
+                        // Don't try to use the TOP command again.
+                        mTopNotSupported = true;
                     }
+                }
+            }
+
+            if (response == null) {
+                executeSimpleCommand(String.format(RETR_COMMAND + " %d",
+                                     mUidToMsgNumMap.get(message.getUid())));
+            }
+
+            try {
+                message.parse(new Pop3ResponseInputStream(mIn));
+
+                // TODO: if we've received fewer lines than requested we also have the complete message.
+                if (lines == -1 || !mCapabilities.top) {
+                    message.setFlag(Flag.X_DOWNLOADED_FULL, true);
+                }
+            } catch (MessagingException me) {
+                /*
+                 * If we're only downloading headers it's possible
+                 * we'll get a broken MIME message which we're not
+                 * real worried about. If we've downloaded the body
+                 * and can't parse it we need to let the user know.
+                 */
+                if (lines == -1) {
+                    throw me;
                 }
             }
         }
@@ -680,7 +890,8 @@ public class Pop3Store extends Store {
         }
 
         @Override
-        public void appendMessages(Message[] messages) throws MessagingException {
+        public Map<String, String> appendMessages(Message[] messages) throws MessagingException {
+            return null;
         }
 
         @Override
@@ -698,10 +909,8 @@ public class Pop3Store extends Store {
         }
 
         @Override
-        public void setFlags(Flag[] flags, boolean value)
-        throws MessagingException {
-            Message[] messages = getMessages(null);
-            setFlags(messages, flags, value);
+        public void setFlags(Flag[] flags, boolean value) throws MessagingException {
+            throw new UnsupportedOperationException("POP3: No setFlags(Flag[],boolean)");
         }
 
         @Override
@@ -732,12 +941,12 @@ public class Pop3Store extends Store {
                     me.setPermanentFailure(true);
                     throw me;
                 }
-                executeSimpleCommand(String.format("DELE %s", msgNum));
+                executeSimpleCommand(String.format(DELE_COMMAND + " %s", msgNum));
             }
         }
 
         private String readLine() throws IOException {
-            StringBuffer sb = new StringBuffer();
+            StringBuilder sb = new StringBuilder();
             int d = mIn.read();
             if (d == -1) {
                 throw new IOException("End of stream reached while trying to read line.");
@@ -768,22 +977,30 @@ public class Pop3Store extends Store {
         private Pop3Capabilities getCapabilities() throws IOException {
             Pop3Capabilities capabilities = new Pop3Capabilities();
             try {
-                String response = executeSimpleCommand("CAPA");
+                String response = executeSimpleCommand(CAPA_COMMAND);
                 while ((response = readLine()) != null) {
                     if (response.equals(".")) {
                         break;
                     }
-                    if (response.equalsIgnoreCase("STLS")) {
+                    if (response.equalsIgnoreCase(STLS_CAPABILITY)) {
                         capabilities.stls = true;
-                    } else if (response.equalsIgnoreCase("UIDL")) {
+                    } else if (response.equalsIgnoreCase(UIDL_CAPABILITY)) {
                         capabilities.uidl = true;
-                    } else if (response.equalsIgnoreCase("PIPELINING")) {
+                    } else if (response.equalsIgnoreCase(PIPELINING_CAPABILITY)) {
                         capabilities.pipelining = true;
-                    } else if (response.equalsIgnoreCase("USER")) {
+                    } else if (response.equalsIgnoreCase(USER_CAPABILITY)) {
                         capabilities.user = true;
-                    } else if (response.equalsIgnoreCase("TOP")) {
+                    } else if (response.equalsIgnoreCase(TOP_CAPABILITY)) {
                         capabilities.top = true;
                     }
+                }
+
+                if (!capabilities.top) {
+                    /*
+                     * If the CAPA command is supported but it doesn't advertise support for the
+                     * TOP command, we won't check for it manually.
+                     */
+                    mTopNotSupported = true;
                 }
             } catch (MessagingException me) {
                 /*
@@ -817,7 +1034,7 @@ public class Pop3Store extends Store {
 
                 String response = readLine();
                 if (response.length() > 1 && response.charAt(0) == '-') {
-                    throw new MessagingException(response);
+                    throw new Pop3ErrorResponse(response);
                 }
 
                 return response;
@@ -827,6 +1044,11 @@ public class Pop3Store extends Store {
                 closeIO();
                 throw new MessagingException("Unable to execute POP3 command", e);
             }
+        }
+
+        @Override
+        public boolean isFlagSupported(Flag flag) {
+            return (flag == Flag.DELETED);
         }
 
         @Override
@@ -880,7 +1102,7 @@ public class Pop3Store extends Store {
             //   }
 //         catch (MessagingException me)
 //         {
-//          Log.w(K9.LOG_TAG, "Could not delete non-existant message", me);
+//          Log.w(K9.LOG_TAG, "Could not delete non-existent message", me);
 //         }
         }
     }
@@ -930,6 +1152,15 @@ public class Pop3Store extends Store {
             mStartOfLine = (d == '\n');
 
             return d;
+        }
+    }
+
+    /**
+     * Exception that is thrown if the server returns an error response.
+     */
+    static class Pop3ErrorResponse extends MessagingException {
+        public Pop3ErrorResponse(String message) {
+            super(message, true);
         }
     }
 }

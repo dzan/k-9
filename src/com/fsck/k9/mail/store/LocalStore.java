@@ -1,7 +1,15 @@
 
 package com.fsck.k9.mail.store;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,7 +25,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-import com.fsck.k9.helper.HtmlConverter;
 import org.apache.commons.io.IOUtils;
 
 import android.app.Application;
@@ -31,13 +38,14 @@ import android.net.Uri;
 import android.util.Log;
 
 import com.fsck.k9.Account;
+import com.fsck.k9.Account.MessageFormat;
 import com.fsck.k9.AccountStats;
 import com.fsck.k9.K9;
 import com.fsck.k9.Preferences;
 import com.fsck.k9.R;
-import com.fsck.k9.Account.MessageFormat;
 import com.fsck.k9.controller.MessageRemovalListener;
 import com.fsck.k9.controller.MessageRetrievalListener;
+import com.fsck.k9.helper.HtmlConverter;
 import com.fsck.k9.helper.Utility;
 import com.fsck.k9.mail.Address;
 import com.fsck.k9.mail.Body;
@@ -62,6 +70,9 @@ import com.fsck.k9.mail.store.LockableDatabase.DbCallback;
 import com.fsck.k9.mail.store.LockableDatabase.WrappedException;
 import com.fsck.k9.mail.store.StorageManager.StorageProvider;
 import com.fsck.k9.provider.AttachmentProvider;
+import com.fsck.k9.search.ConditionsTreeNode;
+import com.fsck.k9.search.LocalSearch;
+import com.fsck.k9.search.SearchSpecification.SEARCHFIELD;
 
 /**
  * <pre>
@@ -661,6 +672,22 @@ public class LocalStore extends Store implements Serializable {
         return folders;
     }
 
+    private long getFolderId(final String name) throws MessagingException {
+        return database.execute(false, new DbCallback<Long>() {
+            @Override
+            public Long doDbWork(final SQLiteDatabase db) {
+                Cursor cursor = null;
+                try {
+                	cursor = db.rawQuery("SELECT id FROM folders WHERE name = '" + name + "'", null);
+                    cursor.moveToFirst();
+                    return cursor.getLong(0);        
+                } finally {
+                    Utility.closeQuietly(cursor);
+                }
+            }
+        });
+    }
+    
     @Override
     public void checkSettings() throws MessagingException {
     }
@@ -861,97 +888,30 @@ public class LocalStore extends Store implements Serializable {
         return true;
     }
 
-    public Message[] searchForMessages(MessageRetrievalListener listener, String[] queryFields, String queryString,
-                                       List<LocalFolder> folders, Message[] messages, final Flag[] requiredFlags, final Flag[] forbiddenFlags) throws MessagingException {
-        List<String> args = new LinkedList<String>();
+	public Message[] searchForMessages(MessageRetrievalListener retrievalListener,
+										LocalSearch search) throws MessagingException {  
+		
+		// update some references in the search that have to be bound to this one store
+		for (ConditionsTreeNode node : search.getLeafSet()) {
+			if (node.mCondition.field == SEARCHFIELD.FOLDER) {				
+				if (node.mCondition.value.equals(LocalSearch.GENERIC_INBOX_NAME)) {
+					node.mCondition.value = mAccount.getInboxFolderName();
+				}
+				node.mCondition.value = String.valueOf(getFolderId(node.mCondition.value));
+			}
+		}
 
-        StringBuilder whereClause = new StringBuilder();
-        if (queryString != null && queryString.length() > 0) {
-            boolean anyAdded = false;
-            String likeString = "%" + queryString + "%";
-            whereClause.append(" AND (");
-            for (String queryField : queryFields) {
-
-                if (anyAdded) {
-                    whereClause.append(" OR ");
-                }
-                whereClause.append(queryField).append(" LIKE ? ");
-                args.add(likeString);
-                anyAdded = true;
-            }
-
-
-            whereClause.append(" )");
-        }
-        if (folders != null && !folders.isEmpty()) {
-            whereClause.append(" AND folder_id in (");
-            boolean anyAdded = false;
-            for (LocalFolder folder : folders) {
-                if (anyAdded) {
-                    whereClause.append(",");
-                }
-                anyAdded = true;
-                whereClause.append("?");
-                args.add(Long.toString(folder.getId()));
-            }
-            whereClause.append(" )");
-        }
-        if (messages != null && messages.length > 0) {
-            whereClause.append(" AND ( ");
-            boolean anyAdded = false;
-            for (Message message : messages) {
-                if (anyAdded) {
-                    whereClause.append(" OR ");
-                }
-                anyAdded = true;
-                whereClause.append(" ( uid = ? AND folder_id = ? ) ");
-                args.add(message.getUid());
-                args.add(Long.toString(((LocalFolder)message.getFolder()).getId()));
-            }
-            whereClause.append(" )");
-        }
-        if (forbiddenFlags != null && forbiddenFlags.length > 0) {
-            whereClause.append(" AND (");
-            boolean anyAdded = false;
-            for (Flag flag : forbiddenFlags) {
-                if (anyAdded) {
-                    whereClause.append(" AND ");
-                }
-                anyAdded = true;
-                whereClause.append(" flags NOT LIKE ?");
-
-                args.add("%" + flag.toString() + "%");
-            }
-            whereClause.append(" )");
-        }
-        if (requiredFlags != null && requiredFlags.length > 0) {
-            whereClause.append(" AND (");
-            boolean anyAdded = false;
-            for (Flag flag : requiredFlags) {
-                if (anyAdded) {
-                    whereClause.append(" OR ");
-                }
-                anyAdded = true;
-                whereClause.append(" flags LIKE ?");
-
-                args.add("%" + flag.toString() + "%");
-            }
-            whereClause.append(" )");
-        }
-
+    	// build sql query       
+        String sqlQuery = "SELECT " + GET_MESSAGES_COLS + "FROM messages WHERE deleted = 0 " 
+        				+ (search.getConditions() != null ? "AND" + search.getConditions() : "") + " ORDER BY date DESC";
+        
         if (K9.DEBUG) {
-            Log.v(K9.LOG_TAG, "whereClause = " + whereClause.toString());
-            Log.v(K9.LOG_TAG, "args = " + args);
+            Log.d(K9.LOG_TAG, "Query = " + sqlQuery);
         }
-        return getMessages(
-                   listener,
-                   null,
-                   "SELECT "
-                   + GET_MESSAGES_COLS
-                   + "FROM messages WHERE deleted = 0 " + whereClause.toString() + " ORDER BY date DESC"
-                   , args.toArray(EMPTY_STRING_ARRAY)
-               );
-    }
+        
+		return getMessages(retrievalListener, null, sqlQuery, new String[] {});
+	}
+	
     /*
      * Given a query string, actually do the query for the messages and
      * call the MessageRetrievalListener for each one

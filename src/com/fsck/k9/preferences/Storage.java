@@ -1,5 +1,15 @@
 package com.fsck.k9.preferences;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -10,25 +20,19 @@ import android.util.Log;
 
 import com.fsck.k9.K9;
 import com.fsck.k9.helper.Utility;
-
-import java.net.URI;
-import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import com.fsck.k9.search.ConditionsTreeNode;
+import com.fsck.k9.search.SearchSpecification.SearchCondition;
 
 public class Storage implements SharedPreferences {
     private static ConcurrentHashMap<Context, Storage> storages =
         new ConcurrentHashMap<Context, Storage>();
 
-    private volatile ConcurrentHashMap<String, String> storage = new ConcurrentHashMap<String, String>();
+    private volatile ConcurrentHashMap<String, String> preferenceStorage = new ConcurrentHashMap<String, String>();
 
     private CopyOnWriteArrayList<OnSharedPreferenceChangeListener> listeners =
         new CopyOnWriteArrayList<OnSharedPreferenceChangeListener>();
 
-    private int DB_VERSION = 2;
+    private int DB_VERSION = 3;
     private String DB_NAME = "preferences_storage";
 
     private ThreadLocal<ConcurrentHashMap<String, String>> workingStorage
@@ -43,16 +47,23 @@ public class Storage implements SharedPreferences {
     private SQLiteDatabase openDB() {
         SQLiteDatabase mDb = context.openOrCreateDatabase(DB_NAME, Context.MODE_PRIVATE, null);
 
-        if (mDb.getVersion() == 1) {
+        if (mDb.getVersion() < 1) {
+            Log.i(K9.LOG_TAG, "Creating Storage database");
+            mDb.execSQL("DROP TABLE IF EXISTS preferences_storage");
+            mDb.execSQL("CREATE TABLE preferences_storage " +
+                        "(primkey TEXT PRIMARY KEY ON CONFLICT REPLACE, value TEXT)");                       
+        }
+        
+        if (mDb.getVersion() < 2) {
             Log.i(K9.LOG_TAG, "Updating preferences to urlencoded username/password");
 
-            String accountUuids = readValue(mDb, "accountUuids");
+            String accountUuids = readPreferenceValue(mDb, "accountUuids");
             if (accountUuids != null && accountUuids.length() != 0) {
                 String[] uuids = accountUuids.split(",");
                 for (String uuid : uuids) {
                     try {
-                        String storeUriStr = Utility.base64Decode(readValue(mDb, uuid + ".storeUri"));
-                        String transportUriStr = Utility.base64Decode(readValue(mDb, uuid + ".transportUri"));
+                        String storeUriStr = Utility.base64Decode(readPreferenceValue(mDb, uuid + ".storeUri"));
+                        String transportUriStr = Utility.base64Decode(readPreferenceValue(mDb, uuid + ".transportUri"));
 
                         URI uri = new URI(transportUriStr);
                         String newUserInfo = null;
@@ -75,7 +86,7 @@ public class Storage implements SharedPreferences {
                         if (newUserInfo != null) {
                             URI newUri = new URI(uri.getScheme(), newUserInfo, uri.getHost(), uri.getPort(), uri.getPath(), uri.getQuery(), uri.getFragment());
                             String newTransportUriStr = Utility.base64Encode(newUri.toString());
-                            writeValue(mDb, uuid + ".transportUri", newTransportUriStr);
+                            writePreferenceValue(mDb, uuid + ".transportUri", newTransportUriStr);
                         }
 
                         uri = new URI(storeUriStr);
@@ -119,24 +130,27 @@ public class Storage implements SharedPreferences {
                         if (newUserInfo != null) {
                             URI newUri = new URI(uri.getScheme(), newUserInfo, uri.getHost(), uri.getPort(), uri.getPath(), uri.getQuery(), uri.getFragment());
                             String newStoreUriStr = Utility.base64Encode(newUri.toString());
-                            writeValue(mDb, uuid + ".storeUri", newStoreUriStr);
+                            writePreferenceValue(mDb, uuid + ".storeUri", newStoreUriStr);
                         }
                     } catch (Exception e) {
                         Log.e(K9.LOG_TAG, "ooops", e);
                     }
                 }
             }
-
-            mDb.setVersion(DB_VERSION);
         }
-
-        if (mDb.getVersion() != DB_VERSION) {
-            Log.i(K9.LOG_TAG, "Creating Storage database");
-            mDb.execSQL("DROP TABLE IF EXISTS preferences_storage");
-            mDb.execSQL("CREATE TABLE preferences_storage " +
-                        "(primkey TEXT PRIMARY KEY ON CONFLICT REPLACE, value TEXT)");
-            mDb.setVersion(DB_VERSION);
+        
+        if (mDb.getVersion() < 3) {
+            mDb.execSQL("DROP TABLE IF EXISTS searches");
+            mDb.execSQL("CREATE TABLE searches (" +
+            			"id INTEGER PRIMARY KEY, name TEXT UNIQUE, accounts TEXT, predefined TEXT)");
+            
+            mDb.execSQL("DROP TABLE IF EXISTS search_conditions");
+            mDb.execSQL("CREATE TABLE search_conditions (" +
+            			"id INTEGER PRIMARY KEY, search_id INTEGER REFERENCES searches, tree_id INTEGER, " +
+            			"key TEXT, value TEXT, attribute TEXT, lft INTEGER, rgt INTEGER, op TEXT)");
         }
+        
+        mDb.setVersion(DB_VERSION);
         return mDb;
     }
 
@@ -168,7 +182,8 @@ public class Storage implements SharedPreferences {
         }
     }
 
-    private void loadValues() {
+    
+    private void loadPreferenceValues() {
         long startTime = System.currentTimeMillis();
         Log.i(K9.LOG_TAG, "Loading preferences from DB into Storage");
         Cursor cursor = null;
@@ -183,7 +198,7 @@ public class Storage implements SharedPreferences {
                 if (K9.DEBUG) {
                     Log.d(K9.LOG_TAG, "Loading key '" + key + "', value = '" + value + "'");
                 }
-                storage.put(key, value);
+                preferenceStorage.put(key, value);
             }
         } finally {
             Utility.closeQuietly(cursor);
@@ -197,23 +212,26 @@ public class Storage implements SharedPreferences {
 
     private Storage(Context context) {
         this.context = context;
-        loadValues();
+        loadPreferenceValues();
     }
 
-    private void keyChange(String key) {
+    /* ********************************************************************
+     *  Preferences Database Interaction
+     * ********************************************************************/
+    private void preferenceKeyChange(String key) {
         ArrayList<String> changedKeys = workingChangedKeys.get();
         if (!changedKeys.contains(key)) {
             changedKeys.add(key);
         }
     }
 
-    protected void put(String key, String value) {
-        ContentValues cv = generateCV(key, value);
+    protected void putPreference(String key, String value) {
+        ContentValues cv = generatePreferenceCV(key, value);
         workingDB.get().insert("preferences_storage", "primkey", cv);
-        liveUpdate(key, value);
+        liveUpdatePreference(key, value);
     }
 
-    protected void put(Map<String, String> insertables) {
+    protected void putPreferences(Map<String, String> insertables) {
         String sql = "INSERT INTO preferences_storage (primkey, value) VALUES (?, ?)";
         SQLiteStatement stmt = workingDB.get().compileStatement(sql);
 
@@ -224,42 +242,42 @@ public class Storage implements SharedPreferences {
             stmt.bindString(2, value);
             stmt.execute();
             stmt.clearBindings();
-            liveUpdate(key, value);
+            liveUpdatePreference(key, value);
         }
         stmt.close();
     }
 
-    private ContentValues generateCV(String key, String value) {
+    private ContentValues generatePreferenceCV(String key, String value) {
         ContentValues cv = new ContentValues();
         cv.put("primkey", key);
         cv.put("value", value);
         return cv;
     }
 
-    private void liveUpdate(String key, String value) {
+    private void liveUpdatePreference(String key, String value) {
         workingStorage.get().put(key, value);
 
-        keyChange(key);
+        preferenceKeyChange(key);
     }
 
-    protected void remove(String key) {
+    protected void removePreference(String key) {
         workingDB.get().delete("preferences_storage", "primkey = ?", new String[] { key });
         workingStorage.get().remove(key);
 
-        keyChange(key);
+        preferenceKeyChange(key);
     }
 
-    protected void removeAll() {
+    protected void removeAllPreferences() {
         for (String key : workingStorage.get().keySet()) {
-            keyChange(key);
+            preferenceKeyChange(key);
         }
         workingDB.get().execSQL("DELETE FROM preferences_storage");
         workingStorage.get().clear();
     }
 
-    protected void doInTransaction(Runnable dbWork) {
+    protected void doInPreferenceTransaction(Runnable dbWork) {
         ConcurrentHashMap<String, String> newStorage = new ConcurrentHashMap<String, String>();
-        newStorage.putAll(storage);
+        newStorage.putAll(preferenceStorage);
         workingStorage.set(newStorage);
 
         SQLiteDatabase mDb = openDB();
@@ -272,7 +290,7 @@ public class Storage implements SharedPreferences {
         try {
             dbWork.run();
             mDb.setTransactionSuccessful();
-            storage = newStorage;
+            preferenceStorage = newStorage;
             for (String changedKey : changedKeys) {
                 for (OnSharedPreferenceChangeListener listener : listeners) {
                     listener.onSharedPreferenceChanged(this, changedKey);
@@ -287,83 +305,7 @@ public class Storage implements SharedPreferences {
         }
     }
 
-    public long size() {
-        return storage.size();
-    }
-
-    //@Override
-    public boolean contains(String key) {
-        return storage.contains(key);
-    }
-
-    //@Override
-    public com.fsck.k9.preferences.Editor edit() {
-        return new com.fsck.k9.preferences.Editor(this);
-    }
-
-    //@Override
-    public Map<String, String> getAll() {
-        return storage;
-    }
-
-    //@Override
-    public boolean getBoolean(String key, boolean defValue) {
-        String val = storage.get(key);
-        if (val == null) {
-            return defValue;
-        }
-        return Boolean.parseBoolean(val);
-    }
-
-    //@Override
-    public float getFloat(String key, float defValue) {
-        String val = storage.get(key);
-        if (val == null) {
-            return defValue;
-        }
-        return Float.parseFloat(val);
-    }
-
-    //@Override
-    public int getInt(String key, int defValue) {
-        String val = storage.get(key);
-        if (val == null) {
-            return defValue;
-        }
-        return Integer.parseInt(val);
-    }
-
-    //@Override
-    public long getLong(String key, long defValue) {
-        String val = storage.get(key);
-        if (val == null) {
-            return defValue;
-        }
-        return Long.parseLong(val);
-    }
-
-    //@Override
-    public String getString(String key, String defValue) {
-        String val = storage.get(key);
-        if (val == null) {
-            return defValue;
-        }
-        return val;
-    }
-
-    //@Override
-    public void registerOnSharedPreferenceChangeListener(
-        OnSharedPreferenceChangeListener listener) {
-        listeners.addIfAbsent(listener);
-    }
-
-    //@Override
-    public void unregisterOnSharedPreferenceChangeListener(
-        OnSharedPreferenceChangeListener listener) {
-        listeners.remove(listener);
-    }
-
-    private String readValue(SQLiteDatabase mDb, String key) {
+    private String readPreferenceValue(SQLiteDatabase mDb, String key) {
         Cursor cursor = null;
         String value = null;
         try {
@@ -389,7 +331,7 @@ public class Storage implements SharedPreferences {
         return value;
     }
 
-    private void writeValue(SQLiteDatabase mDb, String key, String value) {
+    private void writePreferenceValue(SQLiteDatabase mDb, String key, String value) {
         ContentValues cv = new ContentValues();
         cv.put("primkey", key);
         cv.put("value", value);
@@ -400,10 +342,284 @@ public class Storage implements SharedPreferences {
             Log.e(K9.LOG_TAG, "Error writing key '" + key + "', value = '" + value + "'");
         }
     }
+    
+    public long preferencesSize() {
+        return preferenceStorage.size();
+    }
 
+    /* ********************************************************************
+     *  Generic Database Interaction
+     * ********************************************************************/
+    // TODO change back to protected
+    public void doInTransaction(Runnable dbWork) {
+        SQLiteDatabase mDb = openDB();
+        workingDB.set(mDb);
+
+        mDb.beginTransaction();
+        try {
+            dbWork.run();
+            mDb.setTransactionSuccessful();
+        } finally {
+            workingDB.remove();
+            mDb.endTransaction();
+            mDb.close();
+        }
+    }
+    
+    /* ********************************************************************
+     *  SharedPreferences Interface Implementation
+     * ********************************************************************/
+    //@Override
+    public boolean contains(String key) {
+        return preferenceStorage.contains(key);
+    }
+
+    //@Override
+    public com.fsck.k9.preferences.Editor edit() {
+        return new com.fsck.k9.preferences.Editor(this);
+    }
+
+    //@Override
+    public Map<String, String> getAll() {
+        return preferenceStorage;
+    }
+
+    //@Override
+    public boolean getBoolean(String key, boolean defValue) {
+        String val = preferenceStorage.get(key);
+        if (val == null) {
+            return defValue;
+        }
+        return Boolean.parseBoolean(val);
+    }
+
+    //@Override
+    public float getFloat(String key, float defValue) {
+        String val = preferenceStorage.get(key);
+        if (val == null) {
+            return defValue;
+        }
+        return Float.parseFloat(val);
+    }
+
+    //@Override
+    public int getInt(String key, int defValue) {
+        String val = preferenceStorage.get(key);
+        if (val == null) {
+            return defValue;
+        }
+        return Integer.parseInt(val);
+    }
+
+    //@Override
+    public long getLong(String key, long defValue) {
+        String val = preferenceStorage.get(key);
+        if (val == null) {
+            return defValue;
+        }
+        return Long.parseLong(val);
+    }
+
+    //@Override
+    public String getString(String key, String defValue) {
+        String val = preferenceStorage.get(key);
+        if (val == null) {
+            return defValue;
+        }
+        return val;
+    }
+
+    //@Override
+    public void registerOnSharedPreferenceChangeListener(
+        OnSharedPreferenceChangeListener listener) {
+        listeners.addIfAbsent(listener);
+    }
+
+    //@Override
+    public void unregisterOnSharedPreferenceChangeListener(
+        OnSharedPreferenceChangeListener listener) {
+        listeners.remove(listener);
+    }
 
     @Override
     public Set<String> getStringSet(String arg0, Set<String> arg1) {
         throw new RuntimeException("Not implemented");
     }
+
+    /*
+     * Temporarily method until this database has a nicer interface.
+     */
+    public void removeSearchConditions(long searchId){
+        workingDB.get().delete("search_conditions", "search_id = ?", new String[] { Long.toString(searchId) });
+    }
+    
+    public void removeSearch(String searchName){
+    	workingDB.get().delete("searches", "name = ?", new String[] { searchName });
+    }
+    
+    public long addSearch(String name, String accounts, boolean predefined){ 	
+    	
+    	boolean inTransaction = true;
+        SQLiteDatabase mDb = workingDB.get();
+    	if (mDb == null) {
+            mDb = openDB();
+    		inTransaction = false;
+    	}
+    	
+    	// API 7 doesn't have insertWithOnConflict yet so manually
+    	String query = "INSERT OR IGNORE INTO searches (name, accounts, predefined) VALUES ('" +
+    	name + "', '" + accounts + "', '" + String.valueOf(predefined) + "');";
+        SQLiteStatement stmt = mDb.compileStatement(query);
+    	
+        try {
+            return stmt.executeInsert();
+        } finally {
+            stmt.close();
+        	if (!inTransaction) {
+        		mDb.close();
+        	}
+        }
+    }
+    
+    /*
+     * We store the conditions tree in the database. See the following link for 
+     * the approach ( nested sets ):
+     * 
+     * http://www.sitepoint.com/hierarchical-data-database-2/
+     */
+    public void addSearchConditions(long searchId, ConditionsTreeNode conditions){
+    	
+        String sql = "INSERT INTO search_conditions " +
+        		"(search_id, tree_id, key, value, attribute, lft, rgt, op) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        
+    	boolean inTransaction = true;
+        SQLiteDatabase mDb = workingDB.get();
+    	if (mDb == null) {
+            mDb = openDB();
+    		inTransaction = false;
+    	}
+    	
+        SQLiteStatement stmt = mDb.compileStatement(sql);
+        conditions.applyMPTTLabel();
+        
+        for (ConditionsTreeNode node : conditions.preorder()) {
+        	stmt.clearBindings();
+        	stmt.bindLong(5, node.mLeftMPTTMarker);
+        	stmt.bindLong(6, node.mRightMPTTMarker);
+            stmt.bindLong(1, searchId);
+    		stmt.bindString(7, node.mValue.toString());
+    		
+        	SearchCondition tmpCondition = node.getCondition();
+        	
+        	if (tmpCondition != null) {
+        		stmt.bindString(2, tmpCondition.field.toString());
+        		stmt.bindString(3, tmpCondition.value);
+        		stmt.bindString(4, tmpCondition.attribute.toString());
+        	}
+
+            stmt.executeInsert();
+        }
+        
+        stmt.close();
+    	if (!inTransaction) {
+    		mDb.close();
+    	}
+    }
+    
+    public ConditionsTreeNode getSearchConditions(long searchId) {
+    	Cursor cursor = null;
+    	
+    	boolean inTransaction = true;
+        SQLiteDatabase mDb = workingDB.get();
+    	if (mDb == null) {
+            mDb = openDB();
+    		inTransaction = false;
+    	}
+    	
+    	try {
+	    	cursor = mDb.rawQuery("SELECT tree_id, key, value, attribute, lft, rgt, op " +
+	    			"FROM search_conditions WHERE search_id = " + String.valueOf(searchId) + " ORDER BY tree_id ASC, lft ASC", null);
+	    	
+	    	return ConditionsTreeNode.buildTreeFromDB(cursor);
+    	} finally {
+        	Utility.closeQuietly(cursor);
+        	if (!inTransaction) {
+        		mDb.close();
+        	}
+    	}
+    }
+    
+    /**
+     * Returns the metadata belonging to the provided searchID in a
+     * list. The order of the data will be the same as the order in the
+     * table of the database. 
+     * 
+     * @param searchId Id of the saved search.
+     * @return List of the metadata
+     * 
+     * TODO this is not a very clean solution for when we return other 
+     * data then strings..
+     */
+	public List<String> getMetaForSearch(Long searchId) {   	
+    	List<String> tmp = new ArrayList<String>();
+    	
+    	boolean inTransaction = true;
+        SQLiteDatabase mDb = workingDB.get();
+    	if (mDb == null) {
+            mDb = openDB();
+    		inTransaction = false;
+    	}
+    	
+        Cursor cursor = null;
+        
+        try {
+	        cursor = mDb.rawQuery("SELECT accounts, predefined FROM searches " +
+	        		"WHERE id = '" + String.valueOf(searchId) + "'", null);
+	        
+	        // should be only 1 hit
+	        if (cursor.moveToNext()) {
+		        tmp.add(cursor.getString(0));
+		        tmp.add(cursor.getString(1));
+	        }
+        } finally {
+        	Utility.closeQuietly(cursor);
+        	if (!inTransaction) {
+        		mDb.close();
+        	}
+        }
+        
+    	return tmp;
+	}
+	
+    public Map<String, Long> getSavedSearchesIndex(boolean predefined){
+    	Map<String, Long> tmp = new HashMap<String, Long>();
+    	
+    	boolean inTransaction = true;
+        SQLiteDatabase mDb = workingDB.get();
+    	if (mDb == null) {
+            mDb = openDB();
+    		inTransaction = false;
+    	}
+    	
+        Cursor cursor = null;
+        
+        try {
+	        cursor = mDb.rawQuery("SELECT id, name, predefined FROM searches", new String[] {});
+	        while (cursor.moveToNext()) {
+		        boolean isPredefined = Boolean.parseBoolean(cursor.getString(2));
+	        	if (predefined == isPredefined)
+	            	tmp.put(cursor.getString(1), cursor.getLong(0));
+	        }
+        } finally {
+        	Utility.closeQuietly(cursor);
+        	if (!inTransaction) {
+        		mDb.close();
+        	}
+        }
+        
+    	return tmp;
+    }
+    
+    public SQLiteDatabase openDatabase() { return null; }
+    public void closeDatabase() {}
 }

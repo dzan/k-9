@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="10dp" >
+
+    <ScrollView
+        android:id="@+id/configure_search_options"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_above="@+id/configure_search_done_action" >
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <EditText
+                android:id="@+id/configure_search_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentRight="true"
+                android:layout_alignParentTop="true"
+                android:inputType="text"
+                android:ems="10" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignBaseline="@+id/configure_search_name"
+                android:layout_alignBottom="@+id/configure_search_name"
+                android:layout_toLeftOf="@+id/configure_search_name"
+                android:layout_alignParentLeft="true"
+                android:text="Name" />
+
+            <EditText
+                android:id="@+id/configure_search_query"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentRight="true"
+                android:layout_below="@+id/configure_search_name"
+                android:inputType="text"
+                android:ems="10" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignBaseline="@+id/configure_search_query"
+                android:layout_alignBottom="@+id/configure_search_query"
+                android:layout_toLeftOf="@+id/configure_search_query"
+                android:layout_alignParentLeft="true"
+                android:text="Query" />
+        </RelativeLayout>
+    </ScrollView>
+
+    <Button
+        android:id="@+id/configure_search_done_action"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:text="Done" />
+
+</RelativeLayout>

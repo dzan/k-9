@@ -73,10 +73,10 @@ public class Editor implements android.content.SharedPreferences.Editor {
         Runnable committer = new Runnable() {
             public void run() {
                 if (removeAll) {
-                    storage.removeAll();
+                    storage.removeAllPreferences();
                 }
                 for (String removeKey : removals) {
-                    storage.remove(removeKey);
+                    storage.removePreference(removeKey);
                 }
                 Map<String, String> insertables = new HashMap<String, String>();
                 for (Entry<String, String> entry : changes.entrySet()) {
@@ -87,10 +87,10 @@ public class Editor implements android.content.SharedPreferences.Editor {
                         insertables.put(key, newValue);
                     }
                 }
-                storage.put(insertables);
+                storage.putPreferences(insertables);
             }
         };
-        storage.doInTransaction(committer);
+        storage.doInPreferenceTransaction(committer);
         long endTime = System.currentTimeMillis();
         Log.i(K9.LOG_TAG, "Preferences commit took " + (endTime - startTime) + "ms");
 

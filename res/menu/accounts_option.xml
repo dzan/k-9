@@ -12,6 +12,10 @@
 		android:icon="@android:drawable/ic_search_category_default"
 	/>
 	<item
+		android:id="@+id/saved_searches"
+		android:title="Filters"
+	/>
+	<item
 		android:id="@+id/add_new_account"
 		android:title="@string/add_account_action"
 		android:icon="@drawable/ic_menu_add"

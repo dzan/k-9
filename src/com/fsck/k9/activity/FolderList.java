@@ -37,12 +37,14 @@ import com.fsck.k9.mail.Folder;
 import com.fsck.k9.mail.Message;
 import com.fsck.k9.mail.store.LocalStore.LocalFolder;
 import com.fsck.k9.mail.MessagingException;
+import com.fsck.k9.search.LocalSearch;
 import com.fsck.k9.service.MailService;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * FolderList is the primary user interface for the program. This
@@ -565,7 +567,10 @@ public class FolderList extends K9ListActivity {
     }
 
     private void onOpenFolder(String folder) {
-        MessageList.actionHandleFolder(this, mAccount, folder);
+    	LocalSearch search = new LocalSearch(folder);
+    	search.addAccountUuid(mAccount.getUuid());
+    	search.addAllowedFolder(folder);
+        MessageList.actionDisplaySearch(this, search);
         if (K9.manageBack()) {
             finish();
         }
@@ -1295,86 +1300,34 @@ public class FolderList extends K9ListActivity {
         }
         @Override
         public void onClick(View v) {
-            String description = getString(R.string.search_title,
+            final String description = getString(R.string.search_title,
                                            getString(R.string.message_list_title, account.getDescription(), displayName),
                                            getString(searchModifier.resId));
-
-            SearchSpecification searchSpec = new SearchSpecification() {
-                @Override
-                public String[] getAccountUuids() {
-                    return new String[] { account.getUuid() };
-                }
-
-                @Override
-                public Flag[] getForbiddenFlags() {
-                    return searchModifier.forbiddenFlags;
-                }
-
-                @Override
-                public String getQuery() {
-                    return "";
-                }
-
-                @Override
-                public Flag[] getRequiredFlags() {
-                    return searchModifier.requiredFlags;
-                }
-
-                @Override
-                public boolean isIntegrate() {
-                    return false;
-                }
-
-                @Override
-                public String[] getFolderNames() {
-                    return new String[] { folderName };
-                }
-
-            };
-            MessageList.actionHandle(FolderList.this, description, searchSpec);
-
+            
+        	LocalSearch search = new LocalSearch(description);
+        	try {
+				search.allRequiredFlags(searchModifier.requiredFlags);
+	        	search.allForbiddenFlags(searchModifier.forbiddenFlags);
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+        	search.addAllowedFolder(folderName);
+        	search.addAccountUuid(account.getUuid());
+        	MessageList.actionDisplaySearch(FolderList.this, search);
         }
-
     }
-
-    private static Flag[] UNREAD_FLAG_ARRAY = { Flag.SEEN };
 
     private void openUnreadSearch(Context context, final Account account) {
         String description = getString(R.string.search_title, mAccount.getDescription(), getString(R.string.unread_modifier));
-
-        SearchSpecification searchSpec = new SearchSpecification() {
-            //interface has no override            @Override
-            public String[] getAccountUuids() {
-                return new String[] { account.getUuid() };
-            }
-
-            //interface has no override            @Override
-            public Flag[] getForbiddenFlags() {
-                return UNREAD_FLAG_ARRAY;
-            }
-
-            //interface has no override            @Override
-            public String getQuery() {
-                return "";
-            }
-
-            @Override
-            public Flag[] getRequiredFlags() {
-                return null;
-            }
-
-            @Override
-            public boolean isIntegrate() {
-                return false;
-            }
-
-            @Override
-            public String[] getFolderNames() {
-                return null;
-            }
-
-        };
-        MessageList.actionHandle(context, description, searchSpec);
+        LocalSearch search = new LocalSearch(description);
+        search.addAccountUuid(account.getUuid());
+        try {
+			search.allRequiredFlags(new Flag[]{Flag.SEEN});
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
 
 }

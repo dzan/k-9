@@ -1,10 +1,15 @@
 
 package com.fsck.k9.mail;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
+import com.fsck.k9.search.LocalSearch;
+
 /**
  * Flags that can be applied to Messages.
  */
-public enum Flag {
+public enum Flag implements Parcelable{
     DELETED,
     SEEN,
     ANSWERED,
@@ -53,5 +58,31 @@ public enum Flag {
      * database. If this is false, additional headers might be retrieved from
      * the server (if the message is still there).
      */
-    X_GOT_ALL_HEADERS,
+    X_GOT_ALL_HEADERS;
+    
+    
+    /* ********************************************************************
+     *  Parcelable
+     * ********************************************************************/
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		dest.writeString(this.name());		
+	}
+	
+	public static final Parcelable.Creator<Flag> CREATOR
+	    = new Parcelable.Creator<Flag>() {
+		
+	    public Flag createFromParcel(Parcel in) {
+	        return Flag.valueOf(in.readString());
+	    }
+	
+	    public Flag[] newArray(int size) {
+	        return new Flag[size];
+	    }
+	};
 }

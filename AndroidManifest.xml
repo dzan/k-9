@@ -147,6 +147,17 @@
             >
         </activity>
         <activity
+            android:name="com.fsck.k9.activity.SavedSearchesList"
+            android:theme="@style/Theme.K9Dialog"
+            android:configChanges="locale"
+            >
+        </activity>
+        <activity
+            android:name="com.fsck.k9.activity.ConfigureSearch"
+            android:configChanges="locale"
+            >
+        </activity>
+        <activity
             android:name="com.fsck.k9.activity.ChooseIdentity"
             android:theme="@style/Theme.K9Dialog"
             android:label="@string/choose_identity_title"

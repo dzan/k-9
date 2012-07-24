@@ -58,7 +58,6 @@ import com.fsck.k9.FontSizes;
 import com.fsck.k9.K9;
 import com.fsck.k9.Preferences;
 import com.fsck.k9.R;
-import com.fsck.k9.SearchSpecification;
 import com.fsck.k9.activity.setup.AccountSettings;
 import com.fsck.k9.activity.setup.FolderSettings;
 import com.fsck.k9.activity.setup.Prefs;
@@ -73,6 +72,12 @@ import com.fsck.k9.mail.store.LocalStore;
 import com.fsck.k9.mail.store.LocalStore.LocalFolder;
 import com.fsck.k9.mail.store.LocalStore.LocalMessage;
 import com.fsck.k9.mail.store.StorageManager;
+import com.fsck.k9.search.IllegalConditionException;
+import com.fsck.k9.search.LocalSearch;
+import com.fsck.k9.search.SavedSearchesManager;
+import com.fsck.k9.search.SearchSpecification;
+import com.fsck.k9.search.SearchSpecification.ATTRIBUTE;
+import com.fsck.k9.search.SearchSpecification.SEARCHFIELD;
 
 
 /**
@@ -219,17 +224,9 @@ public class MessageList
     private static final int ACTIVITY_CHOOSE_FOLDER_MOVE = 1;
     private static final int ACTIVITY_CHOOSE_FOLDER_COPY = 2;
 
-    private static final String EXTRA_ACCOUNT = "account";
-    private static final String EXTRA_FOLDER  = "folder";
-    private static final String EXTRA_QUERY = "query";
-    private static final String EXTRA_QUERY_FLAGS = "queryFlags";
-    private static final String EXTRA_FORBIDDEN_FLAGS = "forbiddenFlags";
-    private static final String EXTRA_INTEGRATE = "integrate";
-    private static final String EXTRA_ACCOUNT_UUIDS = "accountUuids";
-    private static final String EXTRA_FOLDER_NAMES = "folderNames";
-    private static final String EXTRA_TITLE = "title";
+    private static final String EXTRA_SEARCH = "search";
+    private static final String EXTRA_SAVED_SEARCH_NAME = "savedSearchName";
     private static final String EXTRA_LIST_POSITION = "listPosition";
-    private static final String EXTRA_RETURN_FROM_MESSAGE_VIEW = "returnFromMessageView";
 
     /**
      * Maps a {@link SortType} to a {@link Comparator} implementation.
@@ -279,12 +276,7 @@ public class MessageList
     /**
      * If we're doing a search, this contains the query string.
      */
-    private String mQueryString;
-    private Flag[] mQueryFlags = null;
-    private Flag[] mForbiddenFlags = null;
-    private boolean mIntegrate = false;
-    private String[] mAccountUuids = null;
-    private String[] mFolderNames = null;
+    private boolean mSingleAccountMode;
     private String mTitle;
 
     private MessageListHandler mHandler = new MessageListHandler();
@@ -328,6 +320,8 @@ public class MessageList
     MessageHelper mMessageHelper = MessageHelper.getInstance(this);
 
     private StorageManager.StorageListener mStorageListener = new StorageListenerImplementation();
+
+	private LocalSearch mSearch;
 
     private final class StorageListenerImplementation implements StorageManager.StorageListener {
         @Override
@@ -423,7 +417,7 @@ public class MessageList
         }
 
         private void resetUnreadCountOnThread() {
-            if (mQueryString != null) {
+            if (!mSingleAccountMode) {
                 int unreadCount = 0;
                 synchronized (mAdapter.messages) {
                     for (MessageInfoHolder holder : mAdapter.messages) {
@@ -539,12 +533,12 @@ public class MessageList
 
                 String dispString = mAdapter.mListener.formatHeader(MessageList.this, getString(R.string.message_list_title, mAccount.getDescription(), displayName), mUnreadMessageCount, getTimeFormat());
                 setTitle(dispString);
-            } else if (mQueryString != null) {
+            } else if (!mSingleAccountMode) {
                 if (mTitle != null) {
                     String dispString = mAdapter.mListener.formatHeader(MessageList.this, mTitle, mUnreadMessageCount, getTimeFormat());
                     setTitle(dispString);
                 } else {
-                    setTitle(getString(R.string.search_results) + ": " + mQueryString);
+                    setTitle(getString(R.string.search_results) + ": " + mSearch.getName());
                 }
             }
         }
@@ -559,99 +553,32 @@ public class MessageList
         }
     }
 
-    /**
-     * Show the message list that was used to open the {@link MessageView} for a message.
-     *
-     * <p>
-     * <strong>Note:</strong>
-     * The {@link MessageList} instance should still be around and all we do is bring it back to
-     * the front (see the activity flags).<br>
-     * Out of sheer paranoia we also set the extras that were used to create the original
-     * {@code MessageList} instance. Using those, the activity can be recreated in the unlikely
-     * case of it having been killed by the OS.
-     * </p>
-     *
-     * @param context
-     *         The {@link Context} instance to invoke the {@link Context#startActivity(Intent)}
-     *         method on.
-     * @param extras
-     *         The extras used to create the original {@code MessageList} instance.
-     *
-     * @see MessageView#actionView(Context, MessageReference, ArrayList, Bundle)
-     */
-    public static void actionHandleFolder(Context context, Bundle extras) {
+    // runtime created search
+    public static void actionDisplaySearch(Context context, SearchSpecification search) {
+        context.startActivity(intentDisplaySearch(context, search));
+    }
+    public static Intent intentDisplaySearch(Context context, SearchSpecification search) {
         Intent intent = new Intent(context, MessageList.class);
+        intent.putExtra(EXTRA_SEARCH, search);
+        
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        intent.putExtras(extras);
-        intent.putExtra(EXTRA_RETURN_FROM_MESSAGE_VIEW, true);
-        context.startActivity(intent);
-    }
-
-    public static void actionHandleFolder(Context context, Account account, String folder) {
-        Intent intent = actionHandleFolderIntent(context, account, folder);
-        context.startActivity(intent);
-    }
-
-    public static Intent actionHandleFolderIntent(Context context, Account account, String folder) {
-        Intent intent = new Intent(context, MessageList.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        intent.putExtra(EXTRA_ACCOUNT, account.getUuid());
-
-        if (folder != null) {
-            intent.putExtra(EXTRA_FOLDER, folder);
-        }
         return intent;
     }
-
-    public static void actionHandle(Context context, String title, String queryString, boolean integrate, Flag[] flags, Flag[] forbiddenFlags) {
-        Intent intent = new Intent(context, MessageList.class);
-        intent.putExtra(EXTRA_QUERY, queryString);
-        if (flags != null) {
-            intent.putExtra(EXTRA_QUERY_FLAGS, Utility.combine(flags, ','));
-        }
-        if (forbiddenFlags != null) {
-            intent.putExtra(EXTRA_FORBIDDEN_FLAGS, Utility.combine(forbiddenFlags, ','));
-        }
-        intent.putExtra(EXTRA_INTEGRATE, integrate);
-        intent.putExtra(EXTRA_TITLE, title);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        context.startActivity(intent);
+    
+    // database backed search
+    public static void actionDisplaySavedSearch(Context context, String name) {
+        context.startActivity(intentDisplaySavedSearch(context, name));
     }
-
-    /**
-     * Creates and returns an intent that opens Unified Inbox or All Messages screen.
-     */
-    public static Intent actionHandleAccountIntent(Context context, String title,
-            SearchSpecification searchSpecification) {
+    public static Intent intentDisplaySavedSearch(Context context, String name) {
         Intent intent = new Intent(context, MessageList.class);
-        intent.putExtra(EXTRA_QUERY, searchSpecification.getQuery());
-        if (searchSpecification.getRequiredFlags() != null) {
-            intent.putExtra(EXTRA_QUERY_FLAGS, Utility.combine(searchSpecification.getRequiredFlags(), ','));
-        }
-        if (searchSpecification.getForbiddenFlags() != null) {
-            intent.putExtra(EXTRA_FORBIDDEN_FLAGS, Utility.combine(searchSpecification.getForbiddenFlags(), ','));
-        }
-        intent.putExtra(EXTRA_INTEGRATE, searchSpecification.isIntegrate());
-        intent.putExtra(EXTRA_ACCOUNT_UUIDS, searchSpecification.getAccountUuids());
-        intent.putExtra(EXTRA_FOLDER_NAMES, searchSpecification.getFolderNames());
-        intent.putExtra(EXTRA_TITLE, title);
+        intent.putExtra(EXTRA_SAVED_SEARCH_NAME, name);
+        
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-
         return intent;
-    }
-
-    public static void actionHandle(Context context, String title,
-            SearchSpecification searchSpecification) {
-        Intent intent = actionHandleAccountIntent(context, title, searchSpecification);
-        context.startActivity(intent);
     }
 
     @Override
@@ -686,7 +613,7 @@ public class MessageList
         mTouchView = K9.messageListTouchable();
         mPreviewLines = K9.messageListPreviewLines();
 
-        initializeMessageList(getIntent(), true);
+        processIntent(getIntent(), true);
 
         // Enable gesture detection for MessageLists
         mGestureDetector = new GestureDetector(new MyGestureDetector(true));
@@ -695,71 +622,59 @@ public class MessageList
     @Override
     public void onNewIntent(Intent intent) {
         setIntent(intent); // onNewIntent doesn't autoset our "internal" intent
-        initializeMessageList(intent, false);
+        processIntent(intent, false);
     }
 
-    private void initializeMessageList(Intent intent, boolean create) {
-        boolean returnFromMessageView = intent.getBooleanExtra(
-                EXTRA_RETURN_FROM_MESSAGE_VIEW, false);
-
-        if (!create && returnFromMessageView) {
-            // We're returning from the MessageView activity with "Manage back button" enabled.
-            // So just leave the activity in the state it was left in.
-            return;
-        }
-
-        String accountUuid = intent.getStringExtra(EXTRA_ACCOUNT);
-        mAccount = Preferences.getPreferences(this).getAccount(accountUuid);
-
-        if (mAccount != null && !mAccount.isAvailable(this)) {
-            Log.i(K9.LOG_TAG, "not opening MessageList of unavailable account");
-            onAccountUnavailable();
-            return;
-        }
-
-        mFolderName = intent.getStringExtra(EXTRA_FOLDER);
-        mQueryString = intent.getStringExtra(EXTRA_QUERY);
-
-        String queryFlags = intent.getStringExtra(EXTRA_QUERY_FLAGS);
-        if (queryFlags != null) {
-            String[] flagStrings = queryFlags.split(",");
-            mQueryFlags = new Flag[flagStrings.length];
-            for (int i = 0; i < flagStrings.length; i++) {
-                mQueryFlags[i] = Flag.valueOf(flagStrings[i]);
-            }
-        }
-        String forbiddenFlags = intent.getStringExtra(EXTRA_FORBIDDEN_FLAGS);
-        if (forbiddenFlags != null) {
-            String[] flagStrings = forbiddenFlags.split(",");
-            mForbiddenFlags = new Flag[flagStrings.length];
-            for (int i = 0; i < flagStrings.length; i++) {
-                mForbiddenFlags[i] = Flag.valueOf(flagStrings[i]);
-            }
-        }
-        mIntegrate = intent.getBooleanExtra(EXTRA_INTEGRATE, false);
-        mAccountUuids = intent.getStringArrayExtra(EXTRA_ACCOUNT_UUIDS);
-        mFolderNames = intent.getStringArrayExtra(EXTRA_FOLDER_NAMES);
-        mTitle = intent.getStringExtra(EXTRA_TITLE);
-
-        // Take the initial folder into account only if we are *not* restoring
-        // the activity already.
-        if (mFolderName == null && mQueryString == null) {
-            mFolderName = mAccount.getAutoExpandFolderName();
-        }
-
-        mAdapter = new MessageListAdapter();
-        restorePreviousData();
-
-        if (mFolderName != null) {
-            mCurrentFolder = mAdapter.getFolder(mFolderName, mAccount);
-        }
-
-        // Hide "Load up to x more" footer for search views
-        mFooterView.setVisibility((mQueryString != null) ? View.GONE : View.VISIBLE);
-
-        mController = MessagingController.getInstance(getApplication());
-        mListView.setAdapter(mAdapter);
-    }
+	private void processIntent(Intent intent, boolean create) {    
+	    // if we were passed a saved search
+	    String localSearchName = intent.getStringExtra(EXTRA_SAVED_SEARCH_NAME);
+	    if (localSearchName != null) {
+	    	if (mSearch != null && localSearchName.equals(mSearch.getName())) {
+	    		return;
+	    	} else {
+	    		mSearch = SavedSearchesManager.getInstance(getApplicationContext()).load(localSearchName);
+	        	mFolderName = null;
+	        	mCurrentFolder = null;
+	    	}
+	    // we were passed a not db-backed search
+	    } else {
+	    	mSearch = intent.getParcelableExtra(EXTRA_SEARCH);
+        	mFolderName = null;
+        	mCurrentFolder = null;
+	    }
+	    
+	    // see if we are in mixed account mode
+	    String[] accounts = mSearch.getAccountUuids();
+	    mSingleAccountMode = ( accounts != null && accounts.length == 1 
+	    		&& !accounts[0].equals(SearchSpecification.ALL_ACCOUNTS));
+	    
+	    if (mSingleAccountMode) {
+		    mAccount = Preferences.getPreferences(this).getAccount(accounts[0]);
+		    
+		    if (mAccount != null && !mAccount.isAvailable(this)) {
+		        Log.i(K9.LOG_TAG, "not opening MessageList of unavailable account");
+		        onAccountUnavailable();
+		        return;
+		    }
+		    
+		    if (mSearch.getFolderNames().size() == 1) {
+		    	mFolderName = mSearch.getFolderNames().get(0);
+		    }
+	    }
+	
+	    mAdapter = new MessageListAdapter();
+	    restorePreviousData();
+	
+	    if (mFolderName != null) {
+	        mCurrentFolder = mAdapter.getFolder(mFolderName, mAccount);
+	    }
+	
+	    // Hide "Load up to x more" footer for search views
+	    mFooterView.setVisibility((!mSingleAccountMode) ? View.GONE : View.VISIBLE);
+	
+	    mController = MessagingController.getInstance(getApplication());
+	    mListView.setAdapter(mAdapter);
+	}
 
     private void restorePreviousData() {
         final ActivityState previousData = getLastNonConfigurationInstance();
@@ -850,9 +765,9 @@ public class MessageList
                 if (!mAccount.hasArchiveFolder()) {
                     mBatchArchiveButton.setVisibility(View.GONE);
                 }
-            } else if (mQueryString != null) {
-                mController.searchLocalMessages(mAccountUuids, mFolderNames, null, mQueryString, mIntegrate, mQueryFlags, mForbiddenFlags, mAdapter.mListener);
-                // Don't show the archive button if this is a search.
+            } else if (!mSingleAccountMode) {
+                mController.searchLocalMessages(mSearch, mAdapter.mListener);
+            	// Don't show the archive button if this is a search.
                 mBatchArchiveButton.setVisibility(View.GONE);
             }
 
@@ -867,8 +782,8 @@ public class MessageList
 
                     if (mFolderName != null) {
                         mController.listLocalMessagesSynchronous(mAccount, mFolderName,  mAdapter.mListener);
-                    } else if (mQueryString != null) {
-                        mController.searchLocalMessagesSynchronous(mAccountUuids, mFolderNames, null, mQueryString, mIntegrate, mQueryFlags, mForbiddenFlags, mAdapter.mListener);
+                    } else if (!mSingleAccountMode) {
+                        mController.searchLocalMessages(mSearch, mAdapter.mListener);
                     }
 
 
@@ -973,7 +888,7 @@ public class MessageList
     @Override
     public void onBackPressed() {
         if (K9.manageBack()) {
-            if (mQueryString == null) {
+            if (mSingleAccountMode) {
                 onShowFolderList();
             } else {
                 onAccounts();
@@ -1152,7 +1067,7 @@ public class MessageList
             MessageReference ref = message.message.makeMessageReference();
             Log.i(K9.LOG_TAG, "MessageList sending message " + ref);
 
-            MessageView.actionView(this, ref, messageRefs, getIntent().getExtras());
+            MessageView.actionView(this, ref, messageRefs, mSearch);
         }
 
         /*
@@ -1178,7 +1093,7 @@ public class MessageList
     }
 
     private void onCompose() {
-        if (mQueryString != null) {
+        if (!mSingleAccountMode) {
             /*
              * If we have a query string, we don't have an account to let
              * compose start the default action.
@@ -1549,7 +1464,7 @@ public class MessageList
         }
         }
 
-        if (mQueryString != null) {
+        if (!mSingleAccountMode) {
             // None of the options after this point are "safe" for search results
             //TODO: This is not true for "unread" and "starred" searches in regular folders
             return false;
@@ -1636,7 +1551,7 @@ public class MessageList
 
         setOpsState(menu, true, anySelected);
 
-        if (mQueryString != null) {
+        if (!mSingleAccountMode) {
             menu.findItem(R.id.mark_all_as_read).setVisible(false);
             menu.findItem(R.id.list_folders).setVisible(false);
             menu.findItem(R.id.expunge).setVisible(false);
@@ -1770,9 +1685,9 @@ public class MessageList
             break;
         }
         case R.id.same_sender: {
-            MessageList.actionHandle(MessageList.this,
-                                     "From " + holder.sender, holder.senderAddress, false,
-                                     null, null);
+            /*MessageList.actionHandle(MessageList.this,
+                                     "From " + holder.sender, holder.senderAddress,
+                                     null, null);*/
             break;
         }
         }
@@ -1944,7 +1859,7 @@ public class MessageList
 
             @Override
             public void listLocalMessagesStarted(Account account, String folder) {
-                if ((mQueryString != null && folder == null) || (account != null && account.equals(mAccount))) {
+                if ((!mSingleAccountMode && folder == null) || (account != null && account.equals(mAccount))) {
                     mHandler.progress(true);
                     if (folder != null) {
                         mHandler.folderLoading(folder, true);
@@ -1954,7 +1869,7 @@ public class MessageList
 
             @Override
             public void listLocalMessagesFailed(Account account, String folder, String message) {
-                if ((mQueryString != null && folder == null) || (account != null && account.equals(mAccount))) {
+                if ((!mSingleAccountMode && folder == null) || (account != null && account.equals(mAccount))) {
                     mHandler.sortMessages();
                     mHandler.progress(false);
                     if (folder != null) {
@@ -1965,7 +1880,7 @@ public class MessageList
 
             @Override
             public void listLocalMessagesFinished(Account account, String folder) {
-                if ((mQueryString != null && folder == null) || (account != null && account.equals(mAccount))) {
+                if ((!mSingleAccountMode && folder == null) || (account != null && account.equals(mAccount))) {
                     mHandler.sortMessages();
                     mHandler.progress(false);
                     if (folder != null) {
@@ -2100,7 +2015,7 @@ public class MessageList
                             messageHelper.populate(m, message, new FolderInfoHolder(MessageList.this, messageFolder, messageAccount), messageAccount);
                             messagesToAdd.add(m);
                         } else {
-                            if (mQueryString != null) {
+                            if (!mSingleAccountMode) {
                                 if (verifyAgainstSearch) {
                                     messagesToSearch.add(message);
                                 } else {
@@ -2119,7 +2034,13 @@ public class MessageList
             }
 
             if (!messagesToSearch.isEmpty()) {
-                mController.searchLocalMessages(mAccountUuids, mFolderNames, messagesToSearch.toArray(EMPTY_MESSAGE_ARRAY), mQueryString, mIntegrate, mQueryFlags, mForbiddenFlags,
+            	//mSearch.clearFieldConditions(SEARCHFIELD.UID);
+            	for (Message msg : messagesToSearch) {
+            		try {
+						mSearch.addCondition(SEARCHFIELD.UID, msg.getUid(), ATTRIBUTE.EQUALS);
+					} catch (IllegalConditionException e) {}
+            	}
+                mController.searchLocalMessages(mSearch,
                 new MessagingListener() {
                     @Override
                     public void listLocalMessagesAddMessages(Account account, String folder, List<Message> messages) {
@@ -3005,7 +2926,7 @@ public class MessageList
      * @return The {@code Account} all displayed messages belong to.
      */
     private Account getCurrentAccount(Preferences prefs) {
-        Account account = null;
+        /*Account account = null;
         if (mQueryString != null && !mIntegrate && mAccountUuids != null &&
                 mAccountUuids.length == 1) {
             String uuid = mAccountUuids[0];
@@ -3014,6 +2935,7 @@ public class MessageList
             account = mAccount;
         }
 
-        return account;
+        return account;*/
+    	return mAccount;
     }
 }

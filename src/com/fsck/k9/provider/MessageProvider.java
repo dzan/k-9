@@ -22,6 +22,7 @@ import com.fsck.k9.AccountStats;
 import com.fsck.k9.K9;
 import com.fsck.k9.Preferences;
 import com.fsck.k9.SearchAccount;
+import com.fsck.k9.activity.Accounts;
 import com.fsck.k9.activity.FolderInfoHolder;
 import com.fsck.k9.activity.MessageInfoHolder;
 import com.fsck.k9.activity.MessageList;
@@ -32,6 +33,7 @@ import com.fsck.k9.mail.Folder;
 import com.fsck.k9.mail.Message;
 import com.fsck.k9.mail.MessagingException;
 import com.fsck.k9.mail.store.LocalStore;
+import com.fsck.k9.search.SavedSearchesManager;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -244,11 +246,10 @@ public class MessageProvider extends ContentProvider {
         protected MatrixCursor getMessages(final String[] projection) throws InterruptedException {
             final BlockingQueue<List<MessageInfoHolder>> queue = new SynchronousQueue<List<MessageInfoHolder>>();
 
-            // new code for integrated inbox, only execute this once as it will be processed afterwards via the listener
-            final SearchAccount integratedInboxAccount = SearchAccount.createUnifiedInboxAccount(getContext());
             final MessagingController msgController = MessagingController.getInstance(K9.app);
-
-            msgController.searchLocalMessages(integratedInboxAccount, null,
+        	SavedSearchesManager ssm = SavedSearchesManager.getInstance(getContext());
+        	
+            msgController.searchLocalMessages(ssm.load(Accounts.PREDEFINED_UNIFIED_INBOX),
                                               new MesssageInfoHolderRetrieverListener(queue));
 
             final List<MessageInfoHolder> holders = queue.take();

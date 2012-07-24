@@ -67,7 +67,6 @@ import com.fsck.k9.K9;
 import com.fsck.k9.Preferences;
 import com.fsck.k9.R;
 import com.fsck.k9.SearchAccount;
-import com.fsck.k9.SearchSpecification;
 import com.fsck.k9.activity.misc.ExtendedAsyncTask;
 import com.fsck.k9.activity.misc.NonConfigurationInstance;
 import com.fsck.k9.activity.setup.AccountSettings;
@@ -83,6 +82,9 @@ import com.fsck.k9.mail.Transport;
 import com.fsck.k9.mail.internet.MimeUtility;
 import com.fsck.k9.mail.store.StorageManager;
 import com.fsck.k9.mail.store.WebDavStore;
+import com.fsck.k9.search.LocalSearch;
+import com.fsck.k9.search.SavedSearchesManager;
+import com.fsck.k9.search.SearchSpecification;
 import com.fsck.k9.view.ColorChip;
 import com.fsck.k9.preferences.SettingsExporter;
 import com.fsck.k9.preferences.SettingsImportExportException;
@@ -120,6 +122,12 @@ public class Accounts extends K9ListActivity implements OnItemClickListener, OnC
     private static final int DIALOG_RECREATE_ACCOUNT = 3;
     private static final int DIALOG_NO_FILE_MANAGER = 4;
 
+    /**
+     *  Names of the predefined accounts
+     */
+    public static final String PREDEFINED_UNIFIED_INBOX = "unifiedInbox";
+    public static final String PREDEFINED_ALL_MESSAGES = "allMessages";
+    
     private ConcurrentHashMap<String, AccountStats> accountStats = new ConcurrentHashMap<String, AccountStats>();
 
     private ConcurrentHashMap<BaseAccount, String> pendingWork = new ConcurrentHashMap<BaseAccount, String>();
@@ -129,7 +137,7 @@ public class Accounts extends K9ListActivity implements OnItemClickListener, OnC
 
     private AccountsHandler mHandler = new AccountsHandler();
     private AccountsAdapter mAdapter;
-    private SearchAccount unreadAccount = null;
+    private SearchAccount allMessagesAccount = null;
     private SearchAccount integratedInboxAccount = null;
     private FontSizes mFontSizes = K9.getFontSizes();
 
@@ -383,8 +391,25 @@ public class Accounts extends K9ListActivity implements OnItemClickListener, OnC
      * Creates and initializes the special accounts ('Unified Inbox' and 'All Messages')
      */
     private void createSpecialAccounts() {
-        integratedInboxAccount = SearchAccount.createUnifiedInboxAccount(this);
-        unreadAccount = SearchAccount.createAllMessagesAccount(this);
+    	SavedSearchesManager ssm = SavedSearchesManager.getInstance(this.getApplicationContext());
+    	
+    	try {
+	        integratedInboxAccount = new SearchAccount(ssm.load(PREDEFINED_UNIFIED_INBOX),
+	        		getString(R.string.integrated_inbox_title),getString(R.string.integrated_inbox_detail));
+    	} catch (IllegalArgumentException ex) {
+        	LocalSearch allInbox = new LocalSearch(PREDEFINED_UNIFIED_INBOX);
+        	allInbox.addAllowedFolder(SearchSpecification.GENERIC_INBOX_NAME);
+        	ssm.define(allInbox);
+    	}
+        
+    	try {
+    		allMessagesAccount = new SearchAccount(ssm.load(PREDEFINED_ALL_MESSAGES),
+            		getString(R.string.search_all_messages_title), getString(R.string.search_all_messages_detail));
+    	} catch (IllegalArgumentException ex) {
+        	LocalSearch allMessages = new LocalSearch(PREDEFINED_ALL_MESSAGES);
+        	// not specifying anything will select everything
+        	ssm.define(allMessages);
+    	}
     }
 
     @SuppressWarnings("unchecked")
@@ -472,14 +497,14 @@ public class Accounts extends K9ListActivity implements OnItemClickListener, OnC
 
         List<BaseAccount> newAccounts;
         if (!K9.isHideSpecialAccounts() && accounts.length > 0) {
-            if (integratedInboxAccount == null || unreadAccount == null) {
+            if (integratedInboxAccount == null || allMessagesAccount == null) {
                 createSpecialAccounts();
             }
 
             newAccounts = new ArrayList<BaseAccount>(accounts.length +
                     SPECIAL_ACCOUNTS_COUNT);
             newAccounts.add(integratedInboxAccount);
-            newAccounts.add(unreadAccount);
+            newAccounts.add(allMessagesAccount);
         } else {
             newAccounts = new ArrayList<BaseAccount>(accounts.length);
         }
@@ -503,7 +528,8 @@ public class Accounts extends K9ListActivity implements OnItemClickListener, OnC
                 pendingWork.put(account, "true");
                 final SearchAccount searchAccount = (SearchAccount)account;
 
-                MessagingController.getInstance(getApplication()).searchLocalMessages(searchAccount, null, new MessagingListener() {
+                MessagingController.getInstance(getApplication())
+                	.searchLocalMessages(searchAccount.getRelatedSearch(), new MessagingListener() {
                     @Override
                     public void searchStats(AccountStats stats) {
                         mListener.accountStatusChanged(searchAccount, stats);
@@ -569,7 +595,7 @@ public class Accounts extends K9ListActivity implements OnItemClickListener, OnC
     private boolean onOpenAccount(BaseAccount account) {
         if (account instanceof SearchAccount) {
             SearchAccount searchAccount = (SearchAccount)account;
-            MessageList.actionHandle(this, searchAccount.getDescription(), searchAccount);
+            MessageList.actionDisplaySavedSearch(this, searchAccount.getRelatedSearch().getName());
         } else {
             Account realAccount = (Account)account;
             if (!realAccount.isEnabled()) {
@@ -586,7 +612,10 @@ public class Accounts extends K9ListActivity implements OnItemClickListener, OnC
             if (K9.FOLDER_NONE.equals(realAccount.getAutoExpandFolderName())) {
                 FolderList.actionHandleAccount(this, realAccount);
             } else {
-                MessageList.actionHandleFolder(this, realAccount, realAccount.getAutoExpandFolderName());
+            	LocalSearch search = new LocalSearch(realAccount.getAutoExpandFolderName());
+            	search.addAllowedFolder(realAccount.getAutoExpandFolderName());
+            	search.addAccountUuid(realAccount.getUuid());
+                MessageList.actionDisplaySearch(this, search);
             }
         }
         return true;
@@ -1146,6 +1175,9 @@ public class Accounts extends K9ListActivity implements OnItemClickListener, OnC
             break;
         case R.id.search:
             onSearchRequested();
+            break;
+        case R.id.saved_searches:
+            SavedSearchesList.displayList(this);
             break;
         case R.id.export_all:
             onExport(true, null);
@@ -1759,48 +1791,22 @@ public class Accounts extends K9ListActivity implements OnItemClickListener, OnC
         }
         @Override
         public void onClick(View v) {
-            String description = getString(R.string.search_title, account.getDescription(), getString(searchModifier.resId));
+            final String description = getString(R.string.search_title, account.getDescription(), getString(searchModifier.resId));
             if (account instanceof SearchAccount) {
-                SearchAccount searchAccount = (SearchAccount)account;
-
-                MessageList.actionHandle(Accounts.this,
-                                         description, "", searchAccount.isIntegrate(),
-                                         combine(searchAccount.getRequiredFlags(), searchModifier.requiredFlags),
-                                         combine(searchAccount.getForbiddenFlags(), searchModifier.forbiddenFlags));
+            	LocalSearch search = ((SearchAccount) account).getRelatedSearch();
+            	search.setName(description);
+            	MessageList.actionDisplaySearch(Accounts.this, search);
             } else {
-                SearchSpecification searchSpec = new SearchSpecification() {
-                    @Override
-                    public String[] getAccountUuids() {
-                        return new String[] { account.getUuid() };
-                    }
-
-                    @Override
-                    public Flag[] getForbiddenFlags() {
-                        return searchModifier.forbiddenFlags;
-                    }
-
-                    @Override
-                    public String getQuery() {
-                        return "";
-                    }
-
-                    @Override
-                    public Flag[] getRequiredFlags() {
-                        return searchModifier.requiredFlags;
-                    }
-
-                    @Override
-                    public boolean isIntegrate() {
-                        return false;
-                    }
-
-                    @Override
-                    public String[] getFolderNames() {
-                        return null;
-                    }
-
-                };
-                MessageList.actionHandle(Accounts.this, description, searchSpec);
+            	LocalSearch search = new LocalSearch(description);
+            	try {
+					search.allRequiredFlags(searchModifier.requiredFlags);
+					search.allForbiddenFlags(searchModifier.forbiddenFlags);
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+            	search.addAccountUuid(account.getUuid());
+            	MessageList.actionDisplaySearch(Accounts.this, search);
             }
         }
 

@@ -20,6 +20,7 @@ import com.fsck.k9.helper.FileBrowserHelper.FileBrowserFailOverCallback;
 import com.fsck.k9.mail.*;
 import com.fsck.k9.mail.store.LocalStore.LocalMessage;
 import com.fsck.k9.mail.store.StorageManager;
+import com.fsck.k9.search.SearchSpecification;
 import com.fsck.k9.view.AttachmentView;
 import com.fsck.k9.view.SingleMessageView;
 import com.fsck.k9.view.AttachmentView.AttachmentFileDownloadCallback;
@@ -31,7 +32,7 @@ public class MessageView extends K9Activity implements OnClickListener {
     private static final String EXTRA_MESSAGE_REFERENCE = "com.fsck.k9.MessageView_messageReference";
     private static final String EXTRA_MESSAGE_REFERENCES = "com.fsck.k9.MessageView_messageReferences";
     private static final String EXTRA_NEXT = "com.fsck.k9.MessageView_next";
-    private static final String EXTRA_MESSAGE_LIST_EXTRAS = "com.fsck.k9.MessageView_messageListExtras";
+    private static final String EXTRA_MESSAGE_LIST_SEARCH = "com.fsck.k9.MessageView_messageListSearch";
     private static final String STATE_PGP_DATA = "pgpData";
     private static final int ACTIVITY_CHOOSE_FOLDER_MOVE = 1;
     private static final int ACTIVITY_CHOOSE_FOLDER_COPY = 2;
@@ -79,7 +80,7 @@ public class MessageView extends K9Activity implements OnClickListener {
      *
      * @see MessageList#actionHandleFolder(Context, Bundle)
      */
-    private Bundle mMessageListExtras;
+    private SearchSpecification mMessageListSearch;
 
     /**
      * Screen width in pixels.
@@ -237,8 +238,8 @@ public class MessageView extends K9Activity implements OnClickListener {
     @Override
     public void onBackPressed() {
         if (K9.manageBack()) {
-            if (mMessageListExtras != null) {
-                MessageList.actionHandleFolder(this, mMessageListExtras);
+            if (mMessageListSearch != null) {
+                MessageList.actionDisplaySearch(this, mMessageListSearch);
             }
             finish();
         } else {
@@ -288,9 +289,9 @@ public class MessageView extends K9Activity implements OnClickListener {
     }
 
     public static void actionView(Context context, MessageReference messRef,
-            ArrayList<MessageReference> messReferences, Bundle messageListExtras) {
+            ArrayList<MessageReference> messReferences, SearchSpecification messageListSearch) {
         Intent i = new Intent(context, MessageView.class);
-        i.putExtra(EXTRA_MESSAGE_LIST_EXTRAS, messageListExtras);
+        i.putExtra(EXTRA_MESSAGE_LIST_SEARCH, messageListSearch);
         i.putExtra(EXTRA_MESSAGE_REFERENCE, messRef);
         i.putParcelableArrayListExtra(EXTRA_MESSAGE_REFERENCES, messReferences);
         i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -338,7 +339,7 @@ public class MessageView extends K9Activity implements OnClickListener {
         setTitle("");
         final Intent intent = getIntent();
 
-        mMessageListExtras = intent.getParcelableExtra(EXTRA_MESSAGE_LIST_EXTRAS);
+        mMessageListSearch = intent.getParcelableExtra(EXTRA_MESSAGE_LIST_SEARCH);
 
         Uri uri = intent.getData();
         if (icicle != null) {

@@ -8,6 +8,7 @@ import com.fsck.k9.R;
 import com.fsck.k9.activity.UnreadWidgetConfiguration;
 import com.fsck.k9.activity.FolderList;
 import com.fsck.k9.activity.MessageList;
+import com.fsck.k9.search.LocalSearch;
 
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
@@ -61,8 +62,10 @@ public class UnreadWidgetProvider extends AppWidgetProvider {
                 if (K9.FOLDER_NONE.equals(account.getAutoExpandFolderName())) {
                     clickIntent = FolderList.actionHandleAccountIntent(context, account, null);
                 } else {
-                    clickIntent = MessageList.actionHandleFolderIntent(context, account,
-                            account.getAutoExpandFolderName());
+                	LocalSearch search = new LocalSearch(account.getAutoExpandFolderName());
+                	search.addAllowedFolder(account.getAutoExpandFolderName());
+                	search.addAccountUuid(account.getUuid());
+                    clickIntent = MessageList.intentDisplaySearch(context, search);
                 }
                 clickIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             }

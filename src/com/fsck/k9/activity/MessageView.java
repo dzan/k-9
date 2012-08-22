@@ -1,6 +1,7 @@
 package com.fsck.k9.activity;
 
 import java.io.File;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -66,7 +67,7 @@ public class MessageView extends K9Activity implements OnClickListener {
     private MessageReference mNextMessage = null;
     private MessageReference mPreviousMessage = null;
     private Listener mListener = new Listener();
-    private MessageViewHandler mHandler = new MessageViewHandler();
+    private MessageViewHandler mHandler = new MessageViewHandler(this);
     private StorageManager.StorageListener mStorageListener = new StorageListenerImplementation();
 
     /** this variable is used to save the calling AttachmentView
@@ -254,44 +255,72 @@ public class MessageView extends K9Activity implements OnClickListener {
         }
     }
 
+    /*
+     * Using a pattern to fix a small memory leak, see:
+     * https://groups.google.com/forum/?fromgroups=#!msg/android-developers/1aPZXZG6kWk/lIYDavGYn5UJ
+     */
     class MessageViewHandler extends Handler {
 
+    	private final WeakReference<MessageView> mMessageViewRef;
+    	
+    	public MessageViewHandler(MessageView target) {
+    		mMessageViewRef = new WeakReference<MessageView>(target);
+		}
+    	
         public void progress(final boolean progress) {
-            runOnUiThread(new Runnable() {
-                public void run() {
-                    setProgressBarIndeterminateVisibility(progress);
-                }
-            });
+        	final MessageView ref = mMessageViewRef.get(); 
+        	if (ref != null) {
+	            ref.runOnUiThread(new Runnable() {
+	                public void run() {
+	                    ref.setProgressBarIndeterminateVisibility(progress);
+	                }
+	            });
+        	}
         }
 
         public void addAttachment(final View attachmentView) {
-            runOnUiThread(new Runnable() {
-                public void run() {
-                    mMessageView.addAttachment(attachmentView);
-                }
-            });
+        	final MessageView ref = mMessageViewRef.get(); 
+        	if (ref != null) {
+	            ref.runOnUiThread(new Runnable() {
+	                public void run() {
+	                    ref.mMessageView.addAttachment(attachmentView);
+	                }
+	            });
+        	}
         }
 
         /* A helper for a set of "show a toast" methods */
         private void showToast(final String message, final int toastLength)  {
-            runOnUiThread(new Runnable() {
-                public void run() {
-                    Toast.makeText(MessageView.this, message, toastLength).show();
-                }
-            });
+        	final MessageView ref = mMessageViewRef.get(); 
+        	if (ref != null) {
+	            runOnUiThread(new Runnable() {
+	                public void run() {
+	                    Toast.makeText(ref, message, toastLength).show();
+	                }
+	            });
+        	}
         }
 
         public void networkError() {
-            showToast(getString(R.string.status_network_error), Toast.LENGTH_LONG);
+        	MessageView ref = mMessageViewRef.get(); 
+        	if (ref != null) {
+        		showToast(ref.getString(R.string.status_network_error), Toast.LENGTH_LONG);
+        	}
         }
 
         public void invalidIdError() {
-            showToast(getString(R.string.status_invalid_id_error), Toast.LENGTH_LONG);
+        	MessageView ref = mMessageViewRef.get(); 
+        	if (ref != null) {
+        		showToast(ref.getString(R.string.status_invalid_id_error), Toast.LENGTH_LONG);
+        	}
         }
 
 
         public void fetchingAttachment() {
-            showToast(getString(R.string.message_view_fetching_attachment_toast), Toast.LENGTH_SHORT);
+        	MessageView ref = mMessageViewRef.get(); 
+        	if (ref != null) {
+        		showToast(ref.getString(R.string.message_view_fetching_attachment_toast), Toast.LENGTH_SHORT);
+        	}
         }
     }
 

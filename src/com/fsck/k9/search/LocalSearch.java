@@ -210,15 +210,19 @@ public class LocalSearch implements SearchSpecification {
 	}
 	
 	public void allRequiredFlags(Flag[] requiredFlags) {
-		for (Flag f : requiredFlags) {
-			and(new SearchCondition(SEARCHFIELD.FLAG, ATTRIBUTE.CONTAINS, f.name()));
-		}			
+		if (requiredFlags != null) {
+			for (Flag f : requiredFlags) {
+				and(new SearchCondition(SEARCHFIELD.FLAG, ATTRIBUTE.CONTAINS, f.name()));
+			}
+		}
 	}
 	
 	public void allForbiddenFlags(Flag[] forbiddenFlags) {
-		for (Flag f : forbiddenFlags) {
-			and(new SearchCondition(SEARCHFIELD.FLAG, ATTRIBUTE.NOT_CONTAINS, f.name()));
-		}		
+		if (forbiddenFlags != null) {
+			for (Flag f : forbiddenFlags) {
+				and(new SearchCondition(SEARCHFIELD.FLAG, ATTRIBUTE.NOT_CONTAINS, f.name()));
+			}
+		}
 	}
 	
 	public void addAllowedFolder(String name) {

@@ -1811,22 +1811,19 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
         @Override
         public void onClick(View v) {
             final String description = getString(R.string.search_title, account.getDescription(), getString(searchModifier.resId));
+            LocalSearch search = null;
+            
             if (account instanceof SearchAccount) {
-            	LocalSearch search = ((SearchAccount) account).getRelatedSearch();
+            	search = ((SearchAccount) account).getRelatedSearch();
             	search.setName(description);
-            	MessageList.actionDisplaySearch(Accounts.this, search, false);
             } else {
-            	LocalSearch search = new LocalSearch(description);
-            	try {
-					search.allRequiredFlags(searchModifier.requiredFlags);
-					search.allForbiddenFlags(searchModifier.forbiddenFlags);
-				} catch (Exception e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+            	search = new LocalSearch(description);
             	search.addAccountUuid(account.getUuid());
-            	MessageList.actionDisplaySearch(Accounts.this, search, false);
             }
+            
+			search.allRequiredFlags(searchModifier.requiredFlags);
+			search.allForbiddenFlags(searchModifier.forbiddenFlags);
+        	MessageList.actionDisplaySearch(Accounts.this, search, false);
         }
 
     }

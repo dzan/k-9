@@ -323,8 +323,10 @@ http://k9mail.googlecode.com/.
     <string name="global_settings_confirm_action_mark_all_as_read">Alle als gelesen markieren</string>
     <string name="global_settings_confirm_action_send">Senden</string>
 
-    <string name="global_settings_privacy_mode_title">Vertrauliche Benachrichtigung</string>
-    <string name="global_settings_privacy_mode_summary">Der Betreff der Nachricht wird nicht in der Benachrichtigungszeile angezeigt</string>
+    <string name="global_settings_notification_hide_subject_title">Betreff in Benachrichtigungen verbergen</string>
+    <string name="global_settings_notification_hide_subject_never">Niemals</string>
+    <string name="global_settings_notification_hide_subject_when_locked">Wenn der Bildschirm gesperrt ist</string>
+    <string name="global_settings_notification_hide_subject_always">Immer</string>
 
     <string name="global_settings_batch_buttons">Gruppenoperationen-Schaltflächen</string>
     <string name="global_settings_batch_buttons_summary">Zeige folgende Schaltflächen in der Nachrichtenliste an</string>
@@ -337,7 +339,7 @@ http://k9mail.googlecode.com/.
     <string name="global_settings_unselect">Alle deselektieren</string>
 
     <string name="quiet_time">Ruhezeit</string>
-    <string name="quiet_time_description">Deaktivere Klingeln, Vibrieren und Leuchten in der Nacht</string>
+    <string name="quiet_time_description">Deaktiviere Klingeln, Vibrieren und Leuchten in der Nacht</string>
     <string name="quiet_time_starts">Ruhezeit startet</string>
     <string name="quiet_time_ends">Ruhezeit endet</string>
 
@@ -547,6 +549,9 @@ http://k9mail.googlecode.com/.
     <string name="account_settings_message_format_html">HTML (Bilder und Formatierungen bleiben erhalten)</string>
     <string name="account_settings_message_format_auto">Automatisch (Einfacher Text, es sei denn bei Antwort auf HTML)</string>
 
+    <string name="account_settings_always_show_cc_bcc_label">CC/BCC immer anzeigen</string>
+    <string name="account_settings_always_show_cc_bcc_summary">Zeige die CC/BCC-Texteingabefelder immer an</string>
+
     <string name="account_settings_message_read_receipt_label">Empfangsbestätigung</string>
     <string name="account_settings_message_read_receipt_summary">Immer eine Empfangsbestätigung anfordern</string>
 
@@ -694,7 +699,7 @@ http://k9mail.googlecode.com/.
 
     <string name="manage_identities_title">Identitäten verwalten</string>
 
-    <string name="manage_identities_context_menu_title">Identität berarbeiten</string>
+    <string name="manage_identities_context_menu_title">Identität bearbeiten</string>
 
     <string name="edit_identity_title">Identität bearbeiten</string>
     <string name="new_identity_action">Neue Identität erstellen</string>
@@ -819,8 +824,6 @@ http://k9mail.googlecode.com/.
 
     <string name="settings_messageview_mobile_layout_label">Einfaches Layout</string>
     <string name="settings_messageview_mobile_layout_summary">HTML-Nachrichten werden für kleine Displays optimiert</string>
-    <string name="settings_messageview_zoom_controls_label">System Zoom</string>
-    <string name="settings_messageview_zoom_controls_summary">Aktiviere Zoom-Widgets oder 2-Finger-Zoom, wenn vom Gerät unterstützt</string>
 
     <string name="setting_language_system">Systemvorgabe</string>
 
@@ -829,6 +832,7 @@ http://k9mail.googlecode.com/.
     <string name="background_ops_always">Immer</string>
     <string name="background_ops_enabled">Wenn \'Hintergrunddaten\' aktiviert ist</string>
     <string name="background_ops_auto_sync">Wenn \'Hintergrunddaten\' &amp; \'Automatische Synchronisation\' aktiviert sind</string>
+    <string name="background_ops_auto_sync_only">Wenn \'Automatische Synchronisation\' aktiviert ist</string>
 
     <string name="no_message_seletected_toast">Keine Nachricht ausgewählt</string>
 
@@ -876,9 +880,6 @@ http://k9mail.googlecode.com/.
     <string name="volume_navigation_message">Nachrichtenansicht</string>
     <string name="volume_navigation_list">Diverse Listenansichten</string>
 
-    <string name="manage_back_title">\"Zurück\"-Taste</string>
-    <string name="manage_back_summary">Die \"Zurück\"-Taste bringt Sie eine Ebene nach oben</string>
-
     <string name="start_integrated_inbox_title">Gemeinsamer Posteingang bei Start</string>
     <string name="start_integrated_inbox_summary">Zeige gemeinsamen Posteingang beim Programmstart</string>
 
@@ -906,7 +907,7 @@ http://k9mail.googlecode.com/.
     <string name="folder_settings_include_in_integrated_inbox_label">Integration in gemeinsamen Posteingang</string>
     <string name="folder_settings_include_in_integrated_inbox_summary">Ungelesene Nachrichten im gemeinsamen Posteingang anzeigen</string>
 
-    <string name="account_settings_searchable_label">Ordner duchsuchen</string>
+    <string name="account_settings_searchable_label">Ordner durchsuchen</string>
     <string name="account_settings_searchable_all">Alle</string>
     <string name="account_settings_searchable_displayable">Angezeigte</string>
     <string name="account_settings_searchable_none">Keine</string>

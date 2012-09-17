@@ -42,6 +42,7 @@ import com.fsck.k9.Account;
 import com.fsck.k9.AccountStats;
 import com.fsck.k9.K9;
 import com.fsck.k9.K9.Intents;
+import com.fsck.k9.K9.NotificationHideSubject;
 import com.fsck.k9.NotificationSetting;
 import com.fsck.k9.Preferences;
 import com.fsck.k9.R;
@@ -166,6 +167,8 @@ public class MessagingController implements Runnable {
 
     // Key is accountUuid:folderName:messageUid   ,   value is unimportant
     private ConcurrentHashMap<String, String> deletedUids = new ConcurrentHashMap<String, String>();
+
+    private static final Flag[] SYNC_FLAGS = new Flag[] { Flag.SEEN, Flag.FLAGGED, Flag.ANSWERED, Flag.FORWARDED };
 
     private String createMessageKey(Account account, String folder, Message message) {
         return createMessageKey(account, folder, message.getUid());
@@ -1675,7 +1678,7 @@ public class MessagingController implements Runnable {
                 messageChanged = true;
             }
         } else {
-            for (Flag flag : new Flag[] { Flag.SEEN, Flag.FLAGGED, Flag.ANSWERED }) {
+            for (Flag flag : MessagingController.SYNC_FLAGS) {
                 if (remoteMessage.isSet(flag) != localMessage.isSet(flag)) {
                     localMessage.setFlag(flag, remoteMessage.isSet(flag));
                     messageChanged = true;
@@ -2676,6 +2679,9 @@ public class MessagingController implements Runnable {
                         localFolder.fetch(new Message[] { message }, fp, null);
 
                         // Mark that this message is now fully synched
+                        if (account.isMarkMessageAsReadOnView()) {
+                            message.setFlag(Flag.SEEN, true);
+                        }
                         message.setFlag(Flag.X_DOWNLOADED_FULL, true);
                     }
 
@@ -2945,7 +2951,7 @@ public class MessagingController implements Runnable {
         LocalSearch search = new LocalSearch(account.getInboxFolderName());
         search.addAllowedFolder(account.getInboxFolderName());
         search.addAccountUuid(account.getUuid());
-        Intent intent = MessageList.intentDisplaySearch(mApplication, search);
+        Intent intent = MessageList.intentDisplaySearch(mApplication, search, true);
         PendingIntent pi = PendingIntent.getActivity(mApplication, 0, intent, 0);
         builder.setContentIntent(pi);
 
@@ -3030,7 +3036,7 @@ public class MessagingController implements Runnable {
         LocalSearch search = new LocalSearch(account.getInboxFolderName());
         search.addAllowedFolder(account.getInboxFolderName());
         search.addAccountUuid(account.getUuid());
-        Intent intent = MessageList.intentDisplaySearch(mApplication, search);
+        Intent intent = MessageList.intentDisplaySearch(mApplication, search, true);
         PendingIntent pi = PendingIntent.getActivity(mApplication, 0, intent, 0);
         builder.setContentIntent(pi);
 
@@ -4092,8 +4098,13 @@ public class MessagingController implements Runnable {
 
         // If privacy mode active and keyguard active
         // OR
+        // GlobalPreference is ALWAYS hide subject
+        // OR
         // If we could not set a per-message notification, revert to a default message
-        if ((K9.keyguardPrivacy() && keyguardService.inKeyguardRestrictedInputMode()) || messageNotice.length() == 0) {
+        if ((K9.getNotificationHideSubject() == NotificationHideSubject.WHEN_LOCKED &&
+                    keyguardService.inKeyguardRestrictedInputMode()) ||
+                (K9.getNotificationHideSubject() == NotificationHideSubject.ALWAYS) ||
+                messageNotice.length() == 0) {
             messageNotice = new StringBuilder(context.getString(R.string.notification_new_title));
         }
 

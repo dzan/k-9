@@ -79,16 +79,6 @@ public class ConfigureSearch extends K9Activity implements OnClickListener{
 		// save search
 		SavedSearchesManager.getInstance(this).save(mSearch);
 	}
-	
-    @Override
-    public void onBackPressed() {
-        if (K9.manageBack()) {
-            Accounts.listAccounts(this);
-            finish();
-        } else {
-            super.onBackPressed();
-        }
-    }
     
     @Override
     public void onClick(View v) {

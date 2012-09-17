@@ -152,7 +152,6 @@ public class Account implements BaseAccount {
     private FolderMode mFolderPushMode;
     private FolderMode mFolderTargetMode;
     private int mAccountNumber;
-    private boolean mSaveAllHeaders;
     private boolean mPushPollOnConnect;
     private boolean mNotifySync;
     private SortType mSortType;
@@ -186,8 +185,12 @@ public class Account implements BaseAccount {
     private boolean mCryptoAutoSignature;
     private boolean mCryptoAutoEncrypt;
     private boolean mMarkMessageAsReadOnView;
+    private boolean mAlwaysShowCcBcc;
 
     private CryptoProvider mCryptoProvider = null;
+
+    private ColorChip mUnreadColorChip;
+    private ColorChip mReadColorChip;
 
     /**
      * Indicates whether this account is enabled, i.e. ready for use, or not.
@@ -236,7 +239,6 @@ public class Account implements BaseAccount {
         mLocalStorageProviderId = StorageManager.getInstance(K9.app).getDefaultProviderId();
         mAutomaticCheckIntervalMinutes = -1;
         mIdleRefreshMinutes = 24;
-        mSaveAllHeaders = true;
         mPushPollOnConnect = true;
         mDisplayCount = K9.DEFAULT_VISIBLE_LIMIT;
         mAccountNumber = -1;
@@ -276,6 +278,7 @@ public class Account implements BaseAccount {
         mCryptoAutoEncrypt = false;
         mEnabled = true;
         mMarkMessageAsReadOnView = true;
+        mAlwaysShowCcBcc = false;
 
         searchableFolders = Searchable.ALL;
 
@@ -315,7 +318,6 @@ public class Account implements BaseAccount {
         mAlwaysBcc = prefs.getString(mUuid + ".alwaysBcc", mAlwaysBcc);
         mAutomaticCheckIntervalMinutes = prefs.getInt(mUuid + ".automaticCheckIntervalMinutes", -1);
         mIdleRefreshMinutes = prefs.getInt(mUuid + ".idleRefreshMinutes", 24);
-        mSaveAllHeaders = prefs.getBoolean(mUuid + ".saveAllHeaders", true);
         mPushPollOnConnect = prefs.getBoolean(mUuid + ".pushPollOnConnect", true);
         mDisplayCount = prefs.getInt(mUuid + ".displayCount", K9.DEFAULT_VISIBLE_LIMIT);
         if (mDisplayCount < 0) {
@@ -441,6 +443,7 @@ public class Account implements BaseAccount {
         mCryptoAutoEncrypt = prefs.getBoolean(mUuid + ".cryptoAutoEncrypt", false);
         mEnabled = prefs.getBoolean(mUuid + ".enabled", true);
         mMarkMessageAsReadOnView = prefs.getBoolean(mUuid + ".markMessageAsReadOnView", true);
+        mAlwaysShowCcBcc = prefs.getBoolean(mUuid + ".alwaysShowCcBcc", false);
     }
 
     protected synchronized void delete(Preferences preferences) {
@@ -472,7 +475,6 @@ public class Account implements BaseAccount {
         editor.remove(mUuid + ".alwaysBcc");
         editor.remove(mUuid + ".automaticCheckIntervalMinutes");
         editor.remove(mUuid + ".pushPollOnConnect");
-        editor.remove(mUuid + ".saveAllHeaders");
         editor.remove(mUuid + ".idleRefreshMinutes");
         editor.remove(mUuid + ".lastAutomaticCheckTime");
         editor.remove(mUuid + ".latestOldMessageSeenTime");
@@ -525,6 +527,7 @@ public class Account implements BaseAccount {
         editor.remove(mUuid + ".enableMoveButtons");
         editor.remove(mUuid + ".hideMoveButtonsEnum");
         editor.remove(mUuid + ".markMessageAsReadOnView");
+        editor.remove(mUuid + ".alwaysShowCcBcc");
         for (String type : networkTypes) {
             editor.remove(mUuid + ".useCompression." + type);
         }
@@ -631,7 +634,6 @@ public class Account implements BaseAccount {
         editor.putString(mUuid + ".alwaysBcc", mAlwaysBcc);
         editor.putInt(mUuid + ".automaticCheckIntervalMinutes", mAutomaticCheckIntervalMinutes);
         editor.putInt(mUuid + ".idleRefreshMinutes", mIdleRefreshMinutes);
-        editor.putBoolean(mUuid + ".saveAllHeaders", mSaveAllHeaders);
         editor.putBoolean(mUuid + ".pushPollOnConnect", mPushPollOnConnect);
         editor.putInt(mUuid + ".displayCount", mDisplayCount);
         editor.putLong(mUuid + ".lastAutomaticCheckTime", mLastAutomaticCheckTime);
@@ -688,6 +690,7 @@ public class Account implements BaseAccount {
         editor.putBoolean(mUuid + ".cryptoAutoEncrypt", mCryptoAutoEncrypt);
         editor.putBoolean(mUuid + ".enabled", mEnabled);
         editor.putBoolean(mUuid + ".markMessageAsReadOnView", mMarkMessageAsReadOnView);
+        editor.putBoolean(mUuid + ".alwaysShowCcBcc", mAlwaysShowCcBcc);
 
         editor.putBoolean(mUuid + ".vibrate", mNotificationSetting.shouldVibrate());
         editor.putInt(mUuid + ".vibratePattern", mNotificationSetting.getVibratePattern());
@@ -744,6 +747,8 @@ public class Account implements BaseAccount {
 
     public synchronized void setChipColor(int color) {
         mChipColor = color;
+        mUnreadColorChip = null;
+        mReadColorChip = null;
     }
 
     public synchronized int getChipColor() {
@@ -751,8 +756,22 @@ public class Account implements BaseAccount {
     }
 
 
+    public ColorChip generateColorChip(boolean messageRead) {
+        if (messageRead) {
+            if (mReadColorChip == null) {
+                mReadColorChip = new ColorChip(mChipColor, true);
+            }
+            return mReadColorChip;
+        } else {
+            if (mUnreadColorChip == null) {
+                mUnreadColorChip = new ColorChip(mChipColor, false);
+            }
+            return mUnreadColorChip;
+        }
+    }
+
     public ColorChip generateColorChip() {
-        return new ColorChip(mChipColor);
+        return new ColorChip(mChipColor, false);
     }
 
 
@@ -1373,14 +1392,6 @@ public class Account implements BaseAccount {
         mPushPollOnConnect = pushPollOnConnect;
     }
 
-    public synchronized boolean saveAllHeaders() {
-        return mSaveAllHeaders;
-    }
-
-    public synchronized void setSaveAllHeaders(boolean saveAllHeaders) {
-        mSaveAllHeaders = saveAllHeaders;
-    }
-
     /**
      * Are we storing out localStore on the SD-card instead of the local device
      * memory?<br/>
@@ -1622,5 +1633,13 @@ public class Account implements BaseAccount {
 
     public synchronized void setMarkMessageAsReadOnView(boolean value) {
         mMarkMessageAsReadOnView = value;
+    }
+
+    public synchronized boolean isAlwaysShowCcBcc() {
+        return mAlwaysShowCcBcc;
+    }
+
+    public synchronized void setAlwaysShowCcBcc(boolean show) {
+        mAlwaysShowCcBcc = show;
     }
 }

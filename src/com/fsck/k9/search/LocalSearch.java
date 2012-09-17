@@ -136,9 +136,19 @@ public class LocalSearch implements SearchSpecification {
      * @param uuid Uuid of the account to be added.
      */
     public void addAccountUuid(String uuid) {
+    	if (uuid.equals(ALL_ACCOUNTS)) {
+    		mAccountUuids.clear();
+    	}
     	mAccountUuids.add(uuid);
     }
 
+
+	public void addAccountUuids(String[] accountUuids) {
+		for (String acc : accountUuids) {
+			addAccountUuid(acc);
+		}
+	}
+	
     /**
      * Removes an account UUID from the current search.
      * 

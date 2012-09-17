@@ -31,13 +31,12 @@ public class LauncherShortcuts extends AccountList {
         Intent shortcutIntent = null;
 
         if (account instanceof SearchSpecification) {
-            shortcutIntent = MessageList.intentDisplaySearch(this, (SearchSpecification) account);
+            shortcutIntent = MessageList.intentDisplaySearch(this, (SearchSpecification) account, true);
         } else {
             shortcutIntent = FolderList.actionHandleAccountIntent(this, (Account) account, null,
                     true);
         }
 
-        shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         Intent intent = new Intent();
         intent.putExtra(Intent.EXTRA_SHORTCUT_INTENT, shortcutIntent);
         String description = account.getDescription();

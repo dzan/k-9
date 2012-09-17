@@ -60,12 +60,13 @@ public class UnreadWidgetProvider extends AppWidgetProvider {
                 unreadCount = stats.unreadMessageCount;
                 accountName = account.getDescription();
                 if (K9.FOLDER_NONE.equals(account.getAutoExpandFolderName())) {
-                    clickIntent = FolderList.actionHandleAccountIntent(context, account, null);
+                    clickIntent = FolderList.actionHandleAccountIntent(context, account, null,
+                            false);
                 } else {
                 	LocalSearch search = new LocalSearch(account.getAutoExpandFolderName());
                 	search.addAllowedFolder(account.getAutoExpandFolderName());
                 	search.addAccountUuid(account.getUuid());
-                    clickIntent = MessageList.intentDisplaySearch(context, search);
+                    clickIntent = MessageList.intentDisplaySearch(context, search, true);
                 }
                 clickIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             }

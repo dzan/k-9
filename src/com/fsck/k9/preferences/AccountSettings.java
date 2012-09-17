@@ -33,6 +33,9 @@ public class AccountSettings {
         s.put("alwaysBcc", Settings.versions(
                 new V(11, new StringSetting(""))
             ));
+        s.put("alwaysShowCcBcc", Settings.versions(
+                new V(13, new BooleanSetting(false))
+            ));
         s.put("archiveFolderName", Settings.versions(
                 new V(1, new StringSetting("Archive"))
             ));
@@ -158,9 +161,6 @@ public class AccountSettings {
             ));
         s.put("ringtone", Settings.versions(
                 new V(1, new RingtoneSetting("content://settings/system/notification_sound"))
-            ));
-        s.put("saveAllHeaders", Settings.versions(
-                new V(1, new BooleanSetting(true))
             ));
         s.put("searchableFolders", Settings.versions(
                 new V(1, new EnumSetting(Account.Searchable.class, Account.Searchable.ALL))

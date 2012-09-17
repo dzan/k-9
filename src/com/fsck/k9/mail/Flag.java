@@ -16,6 +16,7 @@ public enum Flag implements Parcelable{
     FLAGGED,
     DRAFT,
     RECENT,
+    FORWARDED,
 
     /*
      * The following flags are for internal library use only.

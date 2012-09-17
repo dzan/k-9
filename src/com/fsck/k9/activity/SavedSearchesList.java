@@ -3,14 +3,14 @@ package com.fsck.k9.activity;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
+import com.actionbarsherlock.view.Menu;
+import com.actionbarsherlock.view.MenuItem;
 import com.fsck.k9.R;
 import com.fsck.k9.search.SavedSearchesManager;
 
@@ -39,7 +39,7 @@ public class SavedSearchesList extends K9ListActivity{
         mListView.setFastScrollEnabled(true);
         mListView.setOnItemClickListener(new OnItemClickListener() {
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                MessageList.actionDisplaySavedSearch(mContext, mAdapter.getItem(position));
+                MessageList.actionDisplaySavedSearch(mContext, mAdapter.getItem(position), false);
             }
         }); 
         
@@ -60,7 +60,7 @@ public class SavedSearchesList extends K9ListActivity{
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
         super.onCreateOptionsMenu(menu);
-        getMenuInflater().inflate(R.menu.saved_searches_option, menu);
+        getSupportMenuInflater().inflate(R.menu.saved_searches_option, menu);
         return true;
 	}
 	

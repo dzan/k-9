@@ -211,13 +211,13 @@ public class LocalSearch implements SearchSpecification {
 	
 	public void allRequiredFlags(Flag[] requiredFlags) {
 		for (Flag f : requiredFlags) {
-			and(new SearchCondition(SEARCHFIELD.FLAG, ATTRIBUTE.EQUALS, f.name()));
+			and(new SearchCondition(SEARCHFIELD.FLAG, ATTRIBUTE.CONTAINS, f.name()));
 		}			
 	}
 	
 	public void allForbiddenFlags(Flag[] forbiddenFlags) {
 		for (Flag f : forbiddenFlags) {
-			and(new SearchCondition(SEARCHFIELD.FLAG, ATTRIBUTE.NOT_EQUALS, f.name()));
+			and(new SearchCondition(SEARCHFIELD.FLAG, ATTRIBUTE.NOT_CONTAINS, f.name()));
 		}		
 	}
 	

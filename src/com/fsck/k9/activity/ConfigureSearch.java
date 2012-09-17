@@ -9,7 +9,6 @@ import android.view.Window;
 import android.widget.Button;
 import android.widget.EditText;
 
-import com.fsck.k9.K9;
 import com.fsck.k9.R;
 import com.fsck.k9.search.IllegalConditionException;
 import com.fsck.k9.search.LocalSearch;

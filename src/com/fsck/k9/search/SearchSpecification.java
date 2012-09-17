@@ -36,21 +36,25 @@ public interface SearchSpecification extends Parcelable {
         	case NOT_CONTAINS:
         	case CONTAINS:
         		queryPart = "'%"+value+"%'";
+        		break;
         	case NOT_EQUALS:
         	case EQUALS:
         	case NOT_IS:
         	case IS:
         		queryPart = "'"+value+"'";
+        		break;
         	case NOT_STARTSWITH:
         	case STARTSWITH:
         		queryPart = "'%"+value+"'";
+        		break;
         	case NOT_ENDSWITH:
         	case ENDSWITH:
         		queryPart = "'"+value+"%'";
+        		break;
         	default: queryPart = "'"+value+"'";
         	}
         	
-        	return (mNegation ? " != " : " = ") + queryPart;
+        	return (mNegation ? " NOT LIKE " : " LIKE ") + queryPart;
         }
     };
     

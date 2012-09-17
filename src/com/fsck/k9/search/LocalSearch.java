@@ -253,14 +253,11 @@ public class LocalSearch implements SearchSpecification {
 	 * @param contains
 	 * @throws IllegalConditionException
 	 */
-	public void addCondition(SEARCHFIELD subject, String string,
-			ATTRIBUTE contains) throws IllegalConditionException {
-		if (subject == SEARCHFIELD.FLAG || subject == SEARCHFIELD.FOLDER) {
-			throw new IllegalConditionException("Use the specific methods to flag/folder related conditions.");
-		}
-		
-		
+	public void addCondition(SEARCHFIELD subject, String value,
+			ATTRIBUTE attribute) throws IllegalConditionException {
+		and(new SearchCondition(subject, attribute, value));
 	}
+	
     /* ********************************************************************
      *  Public Information Methods
      * ********************************************************************/

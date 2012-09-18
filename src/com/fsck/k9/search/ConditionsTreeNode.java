@@ -172,12 +172,14 @@ public class ConditionsTreeNode implements Parcelable{
 	@Override
 	public String toString() {
 		return " " + (mLeft == null ? "" : mLeft) 
-				+ mCondition + (mRight == null ? "" : mRight) ;
+				+ " " + ( mCondition == null ? mValue.name() : mCondition )
+				+ (mRight == null ? "" : mRight) ;
 	}
 	
 	public String toDbString() {
 		return " " + (mLeft == null ? "" : mLeft) 
-				+ mCondition.toDbString() + (mRight == null ? "" : mRight) ;
+				+ " " + ( mCondition == null ? mValue.name() : mCondition )
+				+ (mRight == null ? "" : mRight) ;
 	}
 	
     /*********************************************************************

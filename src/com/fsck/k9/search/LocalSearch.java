@@ -226,8 +226,12 @@ public class LocalSearch implements SearchSpecification {
 	}
 	
 	public void addAllowedFolder(String name) {
-		// TODO find folder sub-tree
-		or(new SearchCondition(SEARCHFIELD.FOLDER, ATTRIBUTE.EQUALS, name));
+		/*
+		 *  TODO find folder sub-tree
+		 *  		- do and on root of it & rest of search
+		 *  		- do or between folder nodes
+		 */
+		and(new SearchCondition(SEARCHFIELD.FOLDER, ATTRIBUTE.EQUALS, name));
 	}
 	
 	/*

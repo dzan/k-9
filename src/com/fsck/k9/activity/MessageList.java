@@ -277,7 +277,6 @@ public class MessageList extends K9ListActivity implements OnItemClickListener {
      * If we're doing a search, this contains the query string.
      */
     private boolean mSingleAccountMode;
-    private String mTitle;
 
     private MessageListHandler mHandler = new MessageListHandler();
 
@@ -505,36 +504,46 @@ public class MessageList extends K9ListActivity implements OnItemClickListener {
         setSupportProgress(level);
     }
 
-    private void setWindowTitle() {
-        // regular folder content display
-        if (mFolderName != null) {
-            String displayName = FolderInfoHolder.getDisplayName(MessageList.this, mAccount,
-                mFolderName);
-
-            mActionBarTitle.setText(displayName);
-
+    private void setWindowTitle() {      
+        if (mSingleAccountMode) {
+        	// title
+            if (mFolderName != null) {
+                String displayName = FolderInfoHolder.getDisplayName(MessageList.this, mAccount,
+                        mFolderName);
+                mActionBarTitle.setText(displayName);
+            } else {
+                if (mSearch.getName().length() > 1) {
+                    // This was a search folder; the search folder has overridden our title.
+                    mActionBarTitle.setText(mSearch.getName());
+                } else {
+                    // This is a search result; set it to the default search result line.
+                    mActionBarTitle.setText(getString(R.string.search_results));
+                }
+            }
+            
+        	// subtitle
             String operation = mAdapter.mListener.getOperation(MessageList.this, getTimeFormat()).trim();
             if (operation.length() < 1) {
                 mActionBarSubTitle.setText(mAccount.getEmail());
             } else {
                 mActionBarSubTitle.setText(operation);
             }
-        } else if (!mSingleAccountMode) {
+        } else {
             // query result display.  This may be for a search folder as opposed to a user-initiated search.
-            if (mTitle != null) {
+            if (mSearch.getName().length() > 1) {
                 // This was a search folder; the search folder has overridden our title.
-                mActionBarTitle.setText(mTitle);
+                mActionBarTitle.setText(mSearch.getName());
             } else {
                 // This is a search result; set it to the default search result line.
                 mActionBarTitle.setText(getString(R.string.search_results));
             }
         }
-
+        
         // set unread count
         if (mUnreadMessageCount == 0) {
             mActionBarUnread.setVisibility(View.GONE);
         } else {
-            if (!mSingleAccountMode && mTitle == null) {
+            if (!mSingleAccountMode) {
                 // This is a search result.  The unread message count is easily confused
                 // with total number of messages in the search result, so let's hide it.
                 mActionBarUnread.setVisibility(View.GONE);

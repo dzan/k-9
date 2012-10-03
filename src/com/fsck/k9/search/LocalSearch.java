@@ -10,28 +10,6 @@ import android.os.Parcelable;
 
 import com.fsck.k9.mail.Flag;
 
-/**
- * This class represents a local search. 
- * 
- * To be able to find all the folder and flag conditions the tree adheres 
- * to some positioning rules:
- *      - All and only forbidden flag conditions are childeren of the forbiddenFlagNode 
- *      - All and only required flag conditions are childeren of the requiredFlagNode 
- *      - All and only folder conditions are childeren of the foldersNode 
- *      
- * There can still be conditions about flags & folders in a combination with other fields,
- * those don't have to be childeren of those nodes. The rules only apply for "level-0" conditions.
- * 
- * Removing conditions is done through matching there unique id in the leafset and then
- * removing them from the tree.
- * 
- * @author dzan
- * 
- * TODO conflicting conditions check
- *         - forbidden folders & forbidden folders subtree
- * TODO assign each node a unique id that's used to retrieve it from the leaveset and remove.
- */
-
 public class LocalSearch implements SearchSpecification {
 
     private String mName;

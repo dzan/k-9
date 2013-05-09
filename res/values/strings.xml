@@ -1154,5 +1154,14 @@ Please submit bug reports, contribute new features and ask questions at
     <string name="mark_all_as_read">Mark all as read</string>
 
     <!-- WizardPager -->
+    <string name="wizard_title">Add new account</string>
     <string name="review">Review</string>
+    <string name="finish">Create Account</string>
+    <string name="wizard_which_account_title">Which account</string>
+    <string name="wizard_which_account_other">Other</string>
+
+    <string name="wizard_email_label">Email</string>
+    <string name="wizard_email_hint">john.doe@mail.com</string>
+    <string name="wizard_password_label">Password</string>
+    <string name="wizard_password_hint">password</string>
 </resources>

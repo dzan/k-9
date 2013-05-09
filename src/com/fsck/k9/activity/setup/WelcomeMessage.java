@@ -41,7 +41,8 @@ public class WelcomeMessage extends K9Activity implements OnClickListener{
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.next: {
-                AccountSetupBasics.actionNewAccount(this);
+                //AccountSetupBasics.actionNewAccount(this);
+                AccountSetupWizard.actionNewAccount(this);
                 finish();
                 break;
             }

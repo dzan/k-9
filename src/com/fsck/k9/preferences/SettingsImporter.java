@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import android.os.Bundle;
+import com.fsck.k9.mail.*;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -23,10 +25,6 @@ import com.fsck.k9.Identity;
 import com.fsck.k9.K9;
 import com.fsck.k9.Preferences;
 import com.fsck.k9.helper.Utility;
-import com.fsck.k9.mail.ConnectionSecurity;
-import com.fsck.k9.mail.ServerSettings;
-import com.fsck.k9.mail.Store;
-import com.fsck.k9.mail.Transport;
 import com.fsck.k9.mail.store.WebDavStore;
 import com.fsck.k9.preferences.Settings.InvalidSettingValueException;
 
@@ -1086,16 +1084,17 @@ public class SettingsImporter {
         private final ImportedServer mImportedServer;
 
         public ImportedServerSettings(ImportedServer server) {
-            super(server.type, server.host, convertPort(server.port),
+            super(convertServerType(server.type), server.host, convertPort(server.port),
                     convertConnectionSecurity(server.connectionSecurity),
-                    server.authenticationType, server.username, server.password);
+                    convertAuthenticationType(server.authenticationType), server.username, server.password);
             mImportedServer = server;
         }
 
         @Override
-        public Map<String, String> getExtra() {
-            return (mImportedServer.extras != null) ?
-                    Collections.unmodifiableMap(mImportedServer.extras.settings) : null;
+        public Bundle getExtra() {
+            /*return (mImportedServer.extras != null) ?
+                    Collections.unmodifiableMap(mImportedServer.extras.settings) : null;*/
+            return null;
         }
 
         private static int convertPort(String port) {
@@ -1111,6 +1110,22 @@ public class SettingsImporter {
                 return ConnectionSecurity.valueOf(connectionSecurity);
             } catch (Exception e) {
                 return ConnectionSecurity.NONE;
+            }
+        }
+
+        private static AuthenticationType convertAuthenticationType(String authenticationType) {
+            try {
+                return AuthenticationType.valueOf(authenticationType);
+            } catch (Exception e) {
+                return AuthenticationType.NONE;
+            }
+        }
+
+        private static ServerType convertServerType(String serverType) {
+            try {
+                return ServerType.valueOf(serverType);
+            } catch (Exception e) {
+                return ServerType.UNSET;
             }
         }
     }

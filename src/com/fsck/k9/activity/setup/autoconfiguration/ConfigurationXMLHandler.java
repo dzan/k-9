@@ -41,7 +41,12 @@ package com.fsck.k9.activity.setup.autoconfiguration;
 
 // Sax stuff
 
+import android.util.Log;
 import com.fsck.k9.activity.setup.autoconfiguration.EmailConfigurationData.*;
+import com.fsck.k9.mail.AuthenticationType;
+import com.fsck.k9.mail.ConnectionSecurity;
+import com.fsck.k9.mail.ServerSettings;
+import com.fsck.k9.mail.ServerType;
 import org.xml.sax.Attributes;
 import org.xml.sax.Locator;
 import org.xml.sax.SAXException;
@@ -125,25 +130,32 @@ public class ConfigurationXMLHandler extends DefaultHandler {
         Mappings
      */
     public static Map<String, AuthenticationType> authenticationTypeMap = new HashMap<String, AuthenticationType>();
-    public static Map<String, SocketType> socketTypeMap = new HashMap<String, SocketType>();
+    public static Map<String, ConnectionSecurity> socketTypeMap = new HashMap<String, ConnectionSecurity>();
+    public static Map<String, ServerType> serverTypeMap = new HashMap<String, ServerType>();
+
     // TODO public static Map<String, RestrictionType> restrictionTypeMap = new HashMap<String, RestrictionType>();
 
     static {
         // all known authentication types
-        authenticationTypeMap.put("plain", AuthenticationType.plain);
-        authenticationTypeMap.put("password-cleartext", AuthenticationType.plain);
-        authenticationTypeMap.put("secure", AuthenticationType.secure);
-        authenticationTypeMap.put("password-encrypted", AuthenticationType.secure);
+        authenticationTypeMap.put("plain", AuthenticationType.PLAIN);
+        authenticationTypeMap.put("password-cleartext", AuthenticationType.PLAIN);
+        authenticationTypeMap.put("secure", AuthenticationType.CRAM_MD5);
+        authenticationTypeMap.put("password-encrypted", AuthenticationType.CRAM_MD5);
         authenticationTypeMap.put("NTLM", AuthenticationType.NTLM);
         authenticationTypeMap.put("GSSAPI", AuthenticationType.GSSAPI);
-        authenticationTypeMap.put("client-IP-address", AuthenticationType.clientIPaddress);
-        authenticationTypeMap.put("TLS-client-cert", AuthenticationType.TLSclientcert);
-        authenticationTypeMap.put("none", AuthenticationType.none);
+        authenticationTypeMap.put("client-IP-address", AuthenticationType.CLIENT_IP);
+        authenticationTypeMap.put("TLS-client-cert", AuthenticationType.TLS_CLIENT_CERT);
+        authenticationTypeMap.put("none", AuthenticationType.NONE);
 
         // known socket types
-        socketTypeMap.put("plain", SocketType.plain);
-        socketTypeMap.put("SSL", SocketType.SSL);
-        socketTypeMap.put("STARTTLS", SocketType.STARTTLS);
+        socketTypeMap.put("plain", ConnectionSecurity.NONE);
+        socketTypeMap.put("SSL", ConnectionSecurity.SSL_TLS_REQUIRED);
+        socketTypeMap.put("STARTTLS", ConnectionSecurity.STARTTLS_REQUIRED);
+
+        // mapping xml strings to server types
+        serverTypeMap.put("imap", ServerType.IMAP);
+        serverTypeMap.put("pop3", ServerType.POP3);
+        serverTypeMap.put("smtp", ServerType.SMTP);
 
         // restriction types
         //restrictionTypeMap.put("clientIPAddress", RestrictionType.clientIPAddress);
@@ -158,7 +170,7 @@ public class ConfigurationXMLHandler extends DefaultHandler {
     private EmailConfigurationData mEmailConfigurationData;
 
     // Helper objects during parsing
-    private Server mServerInProgress;
+    private ParcelableServerSettings mServerInProgress;
     private InputField mInputFieldInProgress;
     private DocumentationBlock mInformationBlockInProgress;
 
@@ -233,18 +245,28 @@ public class ConfigurationXMLHandler extends DefaultHandler {
             does not have plain text inside
         */
         case INCOMINGSERVER: case OUTGOINGSERVER: {
-            if (mServerInProgress != null)
+            if (mServerInProgress != null) {
                 throw new SAXParseException("Nested server-tags. This is not allowed!", mLocator);
-            String type = attributes.getValue(Attribute.TYPE.getXMLStringVersion());
-            if (type != null) {
-                mServerInProgress = ServerType.toType(type).getServerObject(null);
-                if (Tag.toTag(localName) == Tag.INCOMINGSERVER)
-                    mEmailConfigurationData.incomingServer.add((IncomingServer)mServerInProgress);
-                else if (Tag.toTag(localName) == Tag.OUTGOINGSERVER)
-                    mEmailConfigurationData.outgoingServer.add((OutgoingServer)mServerInProgress);
-            } else {
-                // this should never happen, this file is not formed correctly
-                throw new SAXParseException("Incoming|Outgoing-Server tag has no type attribute!", mLocator);
+            }
+
+            String typeString = attributes.getValue(Attribute.TYPE.getXMLStringVersion());
+            ServerType type = serverTypeMap.get(typeString);
+
+            if (type == null) {
+                throw new SAXParseException("Unknown servertype found: " + typeString, mLocator);
+            }
+
+            mServerInProgress = new ParcelableServerSettings(type);
+            switch (type) {
+                case IMAP:  // fall through
+                case POP3:
+                    mEmailConfigurationData.incomingServer.add(mServerInProgress);
+                    break;
+                case SMTP:
+                    mEmailConfigurationData.outgoingServer.add(mServerInProgress);
+                    break;
+                default:
+                    // should never happen
             }
             break;
         }
@@ -252,8 +274,12 @@ public class ConfigurationXMLHandler extends DefaultHandler {
         // does not have plain text inside
         case CHECKINTERVAL: {
             try {
-                ((IncomingServerPOP3)mServerInProgress).checkInterval =
-                    Integer.parseInt(attributes.getValue(Attribute.MINUTES.getXMLStringVersion()));
+                if (mServerInProgress.type != ServerType.POP3) {
+                    throw new SAXParseException("'Check interval' should only occur with POP3 servers.", mLocator);
+                }
+
+                int interval = Integer.parseInt(attributes.getValue(Attribute.MINUTES.getXMLStringVersion()));
+                mServerInProgress.extra.putInt(ServerSettings.POP3_CHECK_INTERVAL, interval);
             } catch (NumberFormatException ex) {
                 throw new SAXParseException("Value of the minutes attribute was not an integer!", mLocator);
             }
@@ -325,6 +351,12 @@ public class ConfigurationXMLHandler extends DefaultHandler {
         }
     }
 
+    private void checkServerType(ServerType type, ServerType requiredType, Tag tag) throws SAXParseException {
+        if (type != requiredType) {
+            throw new SAXParseException("'" + tag + "' should only occur with " +
+                    requiredType + " servers, current server is " + type, mLocator);
+        }
+    }
     @Override
     public void characters(char[] ch, int start, int length) throws SAXException {
 
@@ -348,52 +380,51 @@ public class ConfigurationXMLHandler extends DefaultHandler {
                 Incoming Server
              */
             case HOSTNAME:
-                mServerInProgress.hostname = value;
+                mServerInProgress.host = value;
                 break;
             case PORT:
                 mServerInProgress.port = Integer.parseInt(value);
                 break;
             case SOCKETTYPE:
-                mServerInProgress.socketType = socketTypeMap.get(value);
+                mServerInProgress.connectionSecurity = socketTypeMap.get(value);
                 break;
             case USERNAME:
                 mServerInProgress.username = value;
                 break;
             case AUTHENTICATION:
-                mServerInProgress.authentication = authenticationTypeMap.get(value);
+                mServerInProgress.authenticationType = authenticationTypeMap.get(value);
                 break;
 
             /*
                 Pop3
-                    ( casts are safe, checked in startElement method )
              */
             case LEAVEMESSAGESONSERVER:
-                ((IncomingServerPOP3)mServerInProgress).leaveMessagesOnServer =
-                        Boolean.parseBoolean(value);
+                checkServerType(mServerInProgress.type, ServerType.POP3, mParseContext);
+                mServerInProgress.extra.putBoolean(ServerSettings.POP3_LEAVE_MESSAGES_ON_SERVER, Boolean.parseBoolean(value));
                 break;
             case DOWNLOADONBIFF:
-                ((IncomingServerPOP3)mServerInProgress).downloadOnBiff =
-                        Boolean.parseBoolean(value);
+                checkServerType(mServerInProgress.type, ServerType.POP3, mParseContext);
+                mServerInProgress.extra.putBoolean(ServerSettings.POP3_DOWNLOAD_ON_BIFF, Boolean.parseBoolean(value));
                 break;
             case DAYSTOLEAVEMESSAGESONSERVER:
-                ((IncomingServerPOP3)mServerInProgress).daysToLeaveMessagesOnServer =
-                        Integer.parseInt(value);
+                checkServerType(mServerInProgress.type, ServerType.POP3, mParseContext);
+                mServerInProgress.extra.putInt(ServerSettings.POP3_DAYS_TO_LEAVE_MESSAGES_ON_SERVER, Integer.parseInt(value));
                 break;
 
             /*
                 Outgoing Server extra options
              */
             case ADDTHISSERVER:
-                ((OutgoingServerSMTP)mServerInProgress).addThisServer =
-                        Boolean.parseBoolean(value);
+                checkServerType(mServerInProgress.type, ServerType.SMTP, mParseContext);
+                mServerInProgress.extra.putBoolean(ServerSettings.SMTP_ADD_THIS_SERVER, Boolean.parseBoolean(value));
                 break;
             case USEGLOBALPREFERREDSERVER:
-                ((OutgoingServerSMTP)mServerInProgress).useGlobalPreferredServer =
-                        Boolean.parseBoolean(value);
+                checkServerType(mServerInProgress.type, ServerType.SMTP, mParseContext);
+                mServerInProgress.extra.putBoolean(ServerSettings.SMTP_USE_GLOBAL_PREFERRED_SERVER, Boolean.parseBoolean(value));
                 break;
             case RESTRICTION:
-                ((OutgoingServerSMTP)mServerInProgress).restriction =
-                        RestrictionType.clientIPAddress;
+                checkServerType(mServerInProgress.type, ServerType.SMTP, mParseContext);
+                mServerInProgress.extra.putString(ServerSettings.SMTP_RESTRICTION, RestrictionType.clientIPAddress.toString());
                 break;
 
             /*

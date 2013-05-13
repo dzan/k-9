@@ -52,6 +52,8 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManager;
 
+import android.os.Bundle;
+import com.fsck.k9.mail.*;
 import org.apache.commons.io.IOUtils;
 
 import android.content.Context;
@@ -69,21 +71,6 @@ import com.fsck.k9.helper.StringUtils;
 import com.fsck.k9.helper.Utility;
 import com.fsck.k9.helper.power.TracingPowerManager;
 import com.fsck.k9.helper.power.TracingPowerManager.TracingWakeLock;
-import com.fsck.k9.mail.Authentication;
-import com.fsck.k9.mail.AuthenticationFailedException;
-import com.fsck.k9.mail.Body;
-import com.fsck.k9.mail.CertificateValidationException;
-import com.fsck.k9.mail.ConnectionSecurity;
-import com.fsck.k9.mail.FetchProfile;
-import com.fsck.k9.mail.Flag;
-import com.fsck.k9.mail.Folder;
-import com.fsck.k9.mail.Message;
-import com.fsck.k9.mail.MessagingException;
-import com.fsck.k9.mail.Part;
-import com.fsck.k9.mail.PushReceiver;
-import com.fsck.k9.mail.Pusher;
-import com.fsck.k9.mail.ServerSettings;
-import com.fsck.k9.mail.Store;
 import com.fsck.k9.mail.filter.EOLConvertingOutputStream;
 import com.fsck.k9.mail.filter.FixedLengthInputStream;
 import com.fsck.k9.mail.filter.PeekableInputStream;
@@ -106,15 +93,7 @@ import com.jcraft.jzlib.ZOutputStream;
  * </pre>
  */
 public class ImapStore extends Store {
-    public static final String STORE_TYPE = "IMAP";
-
-    public static final int CONNECTION_SECURITY_NONE = 0;
-    public static final int CONNECTION_SECURITY_TLS_OPTIONAL = 1;
-    public static final int CONNECTION_SECURITY_TLS_REQUIRED = 2;
-    public static final int CONNECTION_SECURITY_SSL_REQUIRED = 3;
-    public static final int CONNECTION_SECURITY_SSL_OPTIONAL = 4;
-
-    public enum AuthType { PLAIN, CRAM_MD5 }
+    public static final ServerType STORE_TYPE = ServerType.IMAP;
 
     private static final int IDLE_READ_TIMEOUT_INCREMENT = 5 * 60 * 1000;
     private static final int IDLE_FAILURE_COUNT_LIMIT = 10;
@@ -156,7 +135,7 @@ public class ImapStore extends Store {
         String host;
         int port;
         ConnectionSecurity connectionSecurity;
-        String authenticationType = null;
+        AuthenticationType authenticationType = null;
         String username = null;
         String password = null;
         String pathPrefix = null;
@@ -202,14 +181,14 @@ public class ImapStore extends Store {
 
                 if (userinfo.endsWith(":")) {
                     // Password is empty. This can only happen after an account was imported.
-                    authenticationType = AuthType.valueOf(userInfoParts[0]).name();
+                    authenticationType = AuthenticationType.valueOf(userInfoParts[0]);
                     username = URLDecoder.decode(userInfoParts[1], "UTF-8");
                 } else if (userInfoParts.length == 2) {
-                    authenticationType = AuthType.PLAIN.name();
+                    authenticationType = AuthenticationType.PLAIN;
                     username = URLDecoder.decode(userInfoParts[0], "UTF-8");
                     password = URLDecoder.decode(userInfoParts[1], "UTF-8");
                 } else {
-                    authenticationType = AuthType.valueOf(userInfoParts[0]).name();
+                    authenticationType = AuthenticationType.valueOf(userInfoParts[0]);
                     username = URLDecoder.decode(userInfoParts[1], "UTF-8");
                     password = URLDecoder.decode(userInfoParts[2], "UTF-8");
                 }
@@ -284,23 +263,16 @@ public class ImapStore extends Store {
                 break;
         }
 
-        AuthType authType;
-        try {
-            authType = AuthType.valueOf(server.authenticationType);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid authentication type: " +
-                    server.authenticationType);
-        }
+        AuthenticationType authType = server.authenticationType;
 
         String userInfo = authType.toString() + ":" + userEnc + ":" + passwordEnc;
         try {
-            Map<String, String> extra = server.getExtra();
+            Bundle extra = server.getExtra();
             String path = null;
             if (extra != null) {
-                boolean autoDetectNamespace = Boolean.TRUE.toString().equals(
-                        extra.get(ImapStoreSettings.AUTODETECT_NAMESPACE_KEY));
+                boolean autoDetectNamespace = extra.getBoolean(ServerSettings.IMAP_AUTODETECT_NAMESPACE_KEY);
                 String pathPrefix = (autoDetectNamespace) ?
-                        null : extra.get(ImapStoreSettings.PATH_PREFIX_KEY);
+                        null : extra.getString(ServerSettings.IMAP_PATH_PREFIX_KEY);
                 path = "/" + (autoDetectNamespace ? "1" : "0") + "|" +
                     ((pathPrefix == null) ? "" : pathPrefix);
             } else {
@@ -320,33 +292,14 @@ public class ImapStore extends Store {
      * @see ImapStore#decodeUri(String)
      */
     public static class ImapStoreSettings extends ServerSettings {
-        public static final String AUTODETECT_NAMESPACE_KEY = "autoDetectNamespace";
-        public static final String PATH_PREFIX_KEY = "pathPrefix";
-
-        public final boolean autoDetectNamespace;
-        public final String pathPrefix;
 
         protected ImapStoreSettings(String host, int port, ConnectionSecurity connectionSecurity,
-                String authenticationType, String username, String password,
+                AuthenticationType authenticationType, String username, String password,
                 boolean autodetectNamespace, String pathPrefix) {
             super(STORE_TYPE, host, port, connectionSecurity, authenticationType, username,
                     password);
-            this.autoDetectNamespace = autodetectNamespace;
-            this.pathPrefix = pathPrefix;
-        }
-
-        @Override
-        public Map<String, String> getExtra() {
-            Map<String, String> extra = new HashMap<String, String>();
-            extra.put(AUTODETECT_NAMESPACE_KEY, Boolean.valueOf(autoDetectNamespace).toString());
-            putIfNotNull(extra, PATH_PREFIX_KEY, pathPrefix);
-            return extra;
-        }
-
-        @Override
-        public ServerSettings newPassword(String newPassword) {
-            return new ImapStoreSettings(host, port, connectionSecurity, authenticationType,
-                    username, newPassword, autoDetectNamespace, pathPrefix);
+            extra.putBoolean(IMAP_AUTODETECT_NAMESPACE_KEY, autodetectNamespace);
+            extra.putString(IMAP_PATH_PREFIX_KEY, pathPrefix);
         }
     }
 
@@ -355,8 +308,8 @@ public class ImapStore extends Store {
     private int mPort;
     private String mUsername;
     private String mPassword;
-    private int mConnectionSecurity;
-    private AuthType mAuthType;
+    private ConnectionSecurity mConnectionSecurity;
+    private AuthenticationType mAuthType;
     private volatile String mPathPrefix;
     private volatile String mCombinedPrefix = null;
     private volatile String mPathDelimeter = null;
@@ -374,12 +327,12 @@ public class ImapStore extends Store {
         }
 
         @Override
-        public int getConnectionSecurity() {
+        public ConnectionSecurity getConnectionSecurity() {
             return mConnectionSecurity;
         }
 
         @Override
-        public AuthType getAuthType() {
+        public AuthenticationType getAuthType() {
             return mAuthType;
         }
 
@@ -447,6 +400,24 @@ public class ImapStore extends Store {
      */
     private HashMap<String, ImapFolder> mFolderCache = new HashMap<String, ImapFolder>();
 
+    public ImapStore(ServerSettings serverData) {
+        super(null);
+
+        mHost = serverData.host;
+        mPort = serverData.port;
+
+        mAuthType = serverData.authenticationType;
+        mConnectionSecurity = serverData.connectionSecurity;
+
+        mUsername = serverData.username;
+        mPassword = serverData.password;
+
+        mPathPrefix = (serverData.extra.getBoolean(ServerSettings.IMAP_AUTODETECT_NAMESPACE_KEY)) ? null :
+                serverData.extra.getString(ServerSettings.IMAP_PATH_PREFIX_KEY);
+
+        mModifiedUtf7Charset = new CharsetProvider().charsetForName("X-RFC-3501");
+    }
+
     public ImapStore(Account account) throws MessagingException {
         super(account);
 
@@ -460,30 +431,15 @@ public class ImapStore extends Store {
         mHost = settings.host;
         mPort = settings.port;
 
-        switch (settings.connectionSecurity) {
-        case NONE:
-            mConnectionSecurity = CONNECTION_SECURITY_NONE;
-            break;
-        case STARTTLS_OPTIONAL:
-            mConnectionSecurity = CONNECTION_SECURITY_TLS_OPTIONAL;
-            break;
-        case STARTTLS_REQUIRED:
-            mConnectionSecurity = CONNECTION_SECURITY_TLS_REQUIRED;
-            break;
-        case SSL_TLS_OPTIONAL:
-            mConnectionSecurity = CONNECTION_SECURITY_SSL_OPTIONAL;
-            break;
-        case SSL_TLS_REQUIRED:
-            mConnectionSecurity = CONNECTION_SECURITY_SSL_REQUIRED;
-            break;
-        }
+        mConnectionSecurity = settings.connectionSecurity;
 
-        mAuthType = AuthType.valueOf(settings.authenticationType);
+        mAuthType = settings.authenticationType;
         mUsername = settings.username;
         mPassword = settings.password;
 
         // Make extra sure mPathPrefix is null if "auto-detect namespace" is configured
-        mPathPrefix = (settings.autoDetectNamespace) ? null : settings.pathPrefix;
+        mPathPrefix = (settings.extra.getBoolean(ServerSettings.IMAP_AUTODETECT_NAMESPACE_KEY)) ? null :
+                settings.extra.getString(ServerSettings.IMAP_PATH_PREFIX_KEY);
 
         mModifiedUtf7Charset = new CharsetProvider().charsetForName("X-RFC-3501");
     }
@@ -2419,7 +2375,7 @@ public class ImapStore extends Store {
             }
 
             try {
-                int connectionSecurity = mSettings.getConnectionSecurity();
+                ConnectionSecurity connectionSecurity = mSettings.getConnectionSecurity();
 
                 // Try all IPv4 and IPv6 addresses of the host
                 InetAddress[] addresses = InetAddress.getAllByName(mSettings.getHost());
@@ -2433,10 +2389,10 @@ public class ImapStore extends Store {
                         SocketAddress socketAddress = new InetSocketAddress(addresses[i],
                                 mSettings.getPort());
 
-                        if (connectionSecurity == CONNECTION_SECURITY_SSL_REQUIRED ||
-                                connectionSecurity == CONNECTION_SECURITY_SSL_OPTIONAL) {
+                        if (connectionSecurity == ConnectionSecurity.SSL_TLS_OPTIONAL ||
+                                connectionSecurity == ConnectionSecurity.SSL_TLS_REQUIRED) {
                             SSLContext sslContext = SSLContext.getInstance("TLS");
-                            boolean secure = connectionSecurity == CONNECTION_SECURITY_SSL_REQUIRED;
+                            boolean secure = connectionSecurity == ConnectionSecurity.SSL_TLS_REQUIRED;
                             sslContext.init(null, new TrustManager[] {
                                                 TrustManagerFactory.get(mSettings.getHost(), secure)
                                             }, new SecureRandom());
@@ -2483,15 +2439,15 @@ public class ImapStore extends Store {
                     }
                 }
 
-                if (mSettings.getConnectionSecurity() == CONNECTION_SECURITY_TLS_OPTIONAL
-                        || mSettings.getConnectionSecurity() == CONNECTION_SECURITY_TLS_REQUIRED) {
+                if (mSettings.getConnectionSecurity() == ConnectionSecurity.STARTTLS_OPTIONAL
+                        || mSettings.getConnectionSecurity() == ConnectionSecurity.STARTTLS_REQUIRED) {
 
                     if (hasCapability("STARTTLS")) {
                         // STARTTLS
                         executeSimpleCommand("STARTTLS");
 
                         SSLContext sslContext = SSLContext.getInstance("TLS");
-                        boolean secure = mSettings.getConnectionSecurity() == CONNECTION_SECURITY_TLS_REQUIRED;
+                        boolean secure = mSettings.getConnectionSecurity() == ConnectionSecurity.STARTTLS_REQUIRED;
                         sslContext.init(null, new TrustManager[] {
                                             TrustManagerFactory.get(mSettings.getHost(), secure)
                                         }, new SecureRandom());
@@ -2502,7 +2458,7 @@ public class ImapStore extends Store {
                                                       .getInputStream(), 1024));
                         mParser = new ImapResponseParser(mIn);
                         mOut = mSocket.getOutputStream();
-                    } else if (mSettings.getConnectionSecurity() == CONNECTION_SECURITY_TLS_REQUIRED) {
+                    } else if (mSettings.getConnectionSecurity() == ConnectionSecurity.STARTTLS_REQUIRED) {
                         throw new MessagingException("TLS not supported but required");
                     }
                 }
@@ -2510,7 +2466,7 @@ public class ImapStore extends Store {
                 mOut = new BufferedOutputStream(mOut, 1024);
 
                 try {
-                    if (mSettings.getAuthType() == AuthType.CRAM_MD5) {
+                    if (mSettings.getAuthType() == AuthenticationType.CRAM_MD5) {
                         authCramMD5();
                         // The authCramMD5 method called on the previous line does not allow for handling updated capabilities
                         // sent by the server.  So, to make sure we update to the post-authentication capability list
@@ -2522,7 +2478,7 @@ public class ImapStore extends Store {
                             throw new MessagingException("Invalid CAPABILITY response received");
                         }
 
-                    } else if (mSettings.getAuthType() == AuthType.PLAIN) {
+                    } else if (mSettings.getAuthType() == AuthenticationType.PLAIN) {
                         receiveCapabilities(executeSimpleCommand(String.format("LOGIN %s %s", ImapStore.encodeString(mSettings.getUsername()), ImapStore.encodeString(mSettings.getPassword())), true));
                     }
                     authSuccess = true;

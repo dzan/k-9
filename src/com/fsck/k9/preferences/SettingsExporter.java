@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.Map.Entry;
+
+import android.os.Bundle;
 import org.xmlpull.v1.XmlSerializer;
 
 import android.content.Context;
@@ -223,23 +225,23 @@ public class SettingsExporter {
         // Write incoming server settings
         ServerSettings incoming = Store.decodeStoreUri(account.getStoreUri());
         serializer.startTag(null, INCOMING_SERVER_ELEMENT);
-        serializer.attribute(null, TYPE_ATTRIBUTE, incoming.type);
+        serializer.attribute(null, TYPE_ATTRIBUTE, incoming.type.name());
 
         writeElement(serializer, HOST_ELEMENT, incoming.host);
         if (incoming.port != -1) {
             writeElement(serializer, PORT_ELEMENT, Integer.toString(incoming.port));
         }
         writeElement(serializer, CONNECTION_SECURITY_ELEMENT, incoming.connectionSecurity.name());
-        writeElement(serializer, AUTHENTICATION_TYPE_ELEMENT, incoming.authenticationType);
+        writeElement(serializer, AUTHENTICATION_TYPE_ELEMENT, incoming.authenticationType.name());
         writeElement(serializer, USERNAME_ELEMENT, incoming.username);
         // XXX For now we don't export the password
         //writeElement(serializer, PASSWORD_ELEMENT, incoming.password);
 
-        Map<String, String> extras = incoming.getExtra();
+        Bundle extras = incoming.getExtra();
         if (extras != null && extras.size() > 0) {
             serializer.startTag(null, EXTRA_ELEMENT);
-            for (Entry<String, String> extra : extras.entrySet()) {
-                writeKeyValue(serializer, extra.getKey(), extra.getValue());
+            for (String key : extras.keySet()) {
+                writeKeyValue(serializer, key, extras.get(key));
             }
             serializer.endTag(null, EXTRA_ELEMENT);
         }
@@ -250,14 +252,14 @@ public class SettingsExporter {
         // Write outgoing server settings
         ServerSettings outgoing = Transport.decodeTransportUri(account.getTransportUri());
         serializer.startTag(null, OUTGOING_SERVER_ELEMENT);
-        serializer.attribute(null, TYPE_ATTRIBUTE, outgoing.type);
+        serializer.attribute(null, TYPE_ATTRIBUTE, outgoing.type.name());
 
         writeElement(serializer, HOST_ELEMENT, outgoing.host);
         if (outgoing.port != -1) {
             writeElement(serializer, PORT_ELEMENT, Integer.toString(outgoing.port));
         }
         writeElement(serializer, CONNECTION_SECURITY_ELEMENT, outgoing.connectionSecurity.name());
-        writeElement(serializer, AUTHENTICATION_TYPE_ELEMENT, outgoing.authenticationType);
+        writeElement(serializer, AUTHENTICATION_TYPE_ELEMENT, outgoing.authenticationType.name());
         writeElement(serializer, USERNAME_ELEMENT, outgoing.username);
         // XXX For now we don't export the password
         //writeElement(serializer, PASSWORD_ELEMENT, outgoing.password);
@@ -265,8 +267,8 @@ public class SettingsExporter {
         extras = outgoing.getExtra();
         if (extras != null && extras.size() > 0) {
             serializer.startTag(null, EXTRA_ELEMENT);
-            for (Entry<String, String> extra : extras.entrySet()) {
-                writeKeyValue(serializer, extra.getKey(), extra.getValue());
+            for (String key : extras.keySet()) {
+                writeKeyValue(serializer, key, extras.get(key));
             }
             serializer.endTag(null, EXTRA_ELEMENT);
         }
@@ -501,12 +503,12 @@ public class SettingsExporter {
         }
     }
 
-    private static void writeKeyValue(XmlSerializer serializer, String key, String value)
+    private static void writeKeyValue(XmlSerializer serializer, String key, Object value)
             throws IllegalArgumentException, IllegalStateException, IOException {
         serializer.startTag(null, VALUE_ELEMENT);
         serializer.attribute(null, KEY_ATTRIBUTE, key);
         if (value != null) {
-            serializer.text(value);
+            serializer.text(value.toString());
         }
         serializer.endTag(null, VALUE_ELEMENT);
     }

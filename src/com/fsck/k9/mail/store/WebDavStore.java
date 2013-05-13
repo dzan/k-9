@@ -1,5 +1,6 @@
 package com.fsck.k9.mail.store;
 
+import android.os.Bundle;
 import android.util.Log;
 
 import com.fsck.k9.Account;
@@ -56,19 +57,7 @@ import java.util.zip.GZIPInputStream;
  * </pre>
  */
 public class WebDavStore extends Store {
-    public static final String STORE_TYPE = "WebDAV";
-
-    // Security options
-    private static final short CONNECTION_SECURITY_NONE = 0;
-    private static final short CONNECTION_SECURITY_TLS_OPTIONAL = 1;
-    private static final short CONNECTION_SECURITY_TLS_REQUIRED = 2;
-    private static final short CONNECTION_SECURITY_SSL_OPTIONAL = 3;
-    private static final short CONNECTION_SECURITY_SSL_REQUIRED = 4;
-
-    // Authentication types
-    private static final short AUTH_TYPE_NONE = 0;
-    private static final short AUTH_TYPE_BASIC = 1;
-    private static final short AUTH_TYPE_FORM_BASED = 2;
+    public static final ServerType STORE_TYPE = ServerType.WEBDAV;
 
     private static final String[] EMPTY_STRING_ARRAY = new String[0];
 
@@ -232,14 +221,11 @@ public class WebDavStore extends Store {
         String userInfo = userEnc + ":" + passwordEnc;
 
         String uriPath;
-        Map<String, String> extra = server.getExtra();
+        Bundle extra = server.getExtra();
         if (extra != null) {
-            String path = extra.get(WebDavStoreSettings.PATH_KEY);
-            path = (path != null) ? path : "";
-            String authPath = extra.get(WebDavStoreSettings.AUTH_PATH_KEY);
-            authPath = (authPath != null) ? authPath : "";
-            String mailboxPath = extra.get(WebDavStoreSettings.MAILBOX_PATH_KEY);
-            mailboxPath = (mailboxPath != null) ? mailboxPath : "";
+            String path = extra.getString(ServerSettings.WEBDAV_PATH_KEY, "");
+            String authPath = extra.getString(ServerSettings.WEBDAV_AUTH_PATH_KEY, "");
+            String mailboxPath = extra.getString(ServerSettings.WEBDAV_MAILBOX_PATH_KEY, "");
             uriPath = "/" + path + "|" + authPath + "|" + mailboxPath;
         } else {
             uriPath = "/||";
@@ -260,46 +246,20 @@ public class WebDavStore extends Store {
      * @see WebDavStore#decodeUri(String)
      */
     public static class WebDavStoreSettings extends ServerSettings {
-        public static final String ALIAS_KEY = "alias";
-        public static final String PATH_KEY = "path";
-        public static final String AUTH_PATH_KEY = "authPath";
-        public static final String MAILBOX_PATH_KEY = "mailboxPath";
-
-        public final String alias;
-        public final String path;
-        public final String authPath;
-        public final String mailboxPath;
-
         protected WebDavStoreSettings(String host, int port, ConnectionSecurity connectionSecurity,
-                String authenticationType, String username, String password, String alias,
+                AuthenticationType authenticationType, String username, String password, String alias,
                 String path, String authPath, String mailboxPath) {
             super(STORE_TYPE, host, port, connectionSecurity, authenticationType, username,
                     password);
-            this.alias = alias;
-            this.path = path;
-            this.authPath = authPath;
-            this.mailboxPath = mailboxPath;
-        }
-
-        @Override
-        public Map<String, String> getExtra() {
-            Map<String, String> extra = new HashMap<String, String>();
-            putIfNotNull(extra, ALIAS_KEY, alias);
-            putIfNotNull(extra, PATH_KEY, path);
-            putIfNotNull(extra, AUTH_PATH_KEY, authPath);
-            putIfNotNull(extra, MAILBOX_PATH_KEY, mailboxPath);
-            return extra;
-        }
-
-        @Override
-        public ServerSettings newPassword(String newPassword) {
-            return new WebDavStoreSettings(host, port, connectionSecurity, authenticationType,
-                    username, newPassword, alias, path, authPath, mailboxPath);
+            this.extra.putString(WEBDAV_ALIAS_KEY, alias);
+            this.extra.putString(WEBDAV_PATH_KEY, path);
+            this.extra.putString(WEBDAV_AUTH_PATH_KEY, authPath);
+            this.extra.putString(WEBDAV_MAILBOX_PATH_KEY, mailboxPath);
         }
     }
 
 
-    private short mConnectionSecurity;
+    private ConnectionSecurity mConnectionSecurity;
     private String mUsername; /* Stores the username for authentications */
     private String mAlias; /* Stores the alias for the user's mailbox */
     private String mPassword; /* Stores the password for authentications */
@@ -315,51 +275,27 @@ public class WebDavStore extends Store {
     private HttpContext mContext = null;
     private String mAuthString;
     private CookieStore mAuthCookies = null;
-    private short mAuthentication = AUTH_TYPE_NONE;
+    private AuthenticationType mAuthentication = AuthenticationType.NONE;
     private String mCachedLoginUrl;
 
     private Folder mSendFolder = null;
     private HashMap<String, WebDavFolder> mFolderList = new HashMap<String, WebDavFolder>();
 
-
-    public WebDavStore(Account account) throws MessagingException {
-        super(account);
-
-        WebDavStoreSettings settings;
-        try {
-            settings = decodeUri(mAccount.getStoreUri());
-        } catch (IllegalArgumentException e) {
-            throw new MessagingException("Error while decoding store URI", e);
-        }
+    public WebDavStore(ServerSettings settings) {
+        super(null);
 
         mHost = settings.host;
         mPort = settings.port;
 
-        switch (settings.connectionSecurity) {
-        case NONE:
-            mConnectionSecurity = CONNECTION_SECURITY_NONE;
-            break;
-        case STARTTLS_OPTIONAL:
-            mConnectionSecurity = CONNECTION_SECURITY_TLS_OPTIONAL;
-            break;
-        case STARTTLS_REQUIRED:
-            mConnectionSecurity = CONNECTION_SECURITY_TLS_REQUIRED;
-            break;
-        case SSL_TLS_OPTIONAL:
-            mConnectionSecurity = CONNECTION_SECURITY_SSL_OPTIONAL;
-            break;
-        case SSL_TLS_REQUIRED:
-            mConnectionSecurity = CONNECTION_SECURITY_SSL_REQUIRED;
-            break;
-        }
+        mConnectionSecurity = settings.connectionSecurity;
 
         mUsername = settings.username;
         mPassword = settings.password;
-        mAlias = settings.alias;
+        mAlias = settings.extra.getString(ServerSettings.WEBDAV_ALIAS_KEY);
 
-        mPath = settings.path;
-        mAuthPath = settings.authPath;
-        mMailboxPath = settings.mailboxPath;
+        mPath = settings.extra.getString(ServerSettings.WEBDAV_PATH_KEY);
+        mAuthPath = settings.extra.getString(ServerSettings.WEBDAV_AUTH_PATH_KEY);
+        mMailboxPath = settings.extra.getString(ServerSettings.WEBDAV_MAILBOX_PATH_KEY);
 
 
         if (mPath == null || mPath.equals("")) {
@@ -384,16 +320,66 @@ public class WebDavStore extends Store {
         // The inbox path would look like: "https://mail.domain.com/Exchange/alias/Inbox".
         mUrl = getRoot() + mPath + mMailboxPath;
 
-        mSecure = mConnectionSecurity == CONNECTION_SECURITY_SSL_REQUIRED;
+        mSecure = mConnectionSecurity == ConnectionSecurity.SSL_TLS_REQUIRED;
+        mAuthString = "Basic " + Utility.base64Encode(mUsername + ":" + mPassword);
+    }
+
+    public WebDavStore(Account account) throws MessagingException {
+        super(account);
+
+        WebDavStoreSettings settings;
+        try {
+            settings = decodeUri(mAccount.getStoreUri());
+        } catch (IllegalArgumentException e) {
+            throw new MessagingException("Error while decoding store URI", e);
+        }
+
+        mHost = settings.host;
+        mPort = settings.port;
+
+        mConnectionSecurity = settings.connectionSecurity;
+
+        mUsername = settings.username;
+        mPassword = settings.password;
+        mAlias = settings.extra.getString(ServerSettings.WEBDAV_ALIAS_KEY);
+
+        mPath = settings.extra.getString(ServerSettings.WEBDAV_PATH_KEY);
+        mAuthPath = settings.extra.getString(ServerSettings.WEBDAV_AUTH_PATH_KEY);
+        mMailboxPath = settings.extra.getString(ServerSettings.WEBDAV_MAILBOX_PATH_KEY);
+
+
+        if (mPath == null || mPath.equals("")) {
+            mPath = "/Exchange";
+        } else if (!mPath.startsWith("/")) {
+            mPath = "/" + mPath;
+        }
+
+        if (mMailboxPath == null || mMailboxPath.equals("")) {
+            mMailboxPath = "/" + mAlias;
+        } else if (!mMailboxPath.startsWith("/")) {
+            mMailboxPath = "/" + mMailboxPath;
+        }
+
+        if (mAuthPath != null &&
+                !mAuthPath.equals("") &&
+                !mAuthPath.startsWith("/")) {
+            mAuthPath = "/" + mAuthPath;
+        }
+
+        // The URL typically looks like the following: "https://mail.domain.com/Exchange/alias".
+        // The inbox path would look like: "https://mail.domain.com/Exchange/alias/Inbox".
+        mUrl = getRoot() + mPath + mMailboxPath;
+
+        mSecure = mConnectionSecurity == ConnectionSecurity.SSL_TLS_REQUIRED;
         mAuthString = "Basic " + Utility.base64Encode(mUsername + ":" + mPassword);
     }
 
     private String getRoot() {
         String root;
-        if (mConnectionSecurity == CONNECTION_SECURITY_TLS_REQUIRED ||
-                mConnectionSecurity == CONNECTION_SECURITY_SSL_REQUIRED ||
-                mConnectionSecurity == CONNECTION_SECURITY_TLS_OPTIONAL ||
-                mConnectionSecurity == CONNECTION_SECURITY_SSL_OPTIONAL) {
+        if (mConnectionSecurity == ConnectionSecurity.STARTTLS_REQUIRED ||
+                mConnectionSecurity == ConnectionSecurity.SSL_TLS_REQUIRED ||
+                mConnectionSecurity == ConnectionSecurity.SSL_TLS_OPTIONAL ||
+                mConnectionSecurity == ConnectionSecurity.SSL_TLS_OPTIONAL) {
             root = "https";
         } else {
             root = "http";
@@ -749,10 +735,10 @@ public class WebDavStore extends Store {
     public boolean authenticate()
     throws MessagingException {
         try {
-            if (mAuthentication == AUTH_TYPE_NONE) {
+            if (mAuthentication == AuthenticationType.NONE) {
                 ConnectionInfo info = doInitialConnection();
 
-                if (info.requiredAuthType == AUTH_TYPE_BASIC) {
+                if (info.requiredAuthType == AuthenticationType.WEBDAV_BASIC) {
                     HttpGeneric request = new HttpGeneric(mUrl);
                     request.setMethod("GET");
                     request.setHeader("Authorization", mAuthString);
@@ -762,20 +748,20 @@ public class WebDavStore extends Store {
 
                     int statusCode = response.getStatusLine().getStatusCode();
                     if (statusCode >= 200 && statusCode < 300) {
-                        mAuthentication = AUTH_TYPE_BASIC;
+                        mAuthentication = AuthenticationType.WEBDAV_BASIC;
                     } else if (statusCode == 401) {
                         throw new MessagingException("Invalid username or password for authentication.");
                     } else {
                         throw new MessagingException("Error with code " + response.getStatusLine().getStatusCode() +
                                                      " during request processing: " + response.getStatusLine().toString());
                     }
-                } else if (info.requiredAuthType == AUTH_TYPE_FORM_BASED) {
+                } else if (info.requiredAuthType == AuthenticationType.WEBDAV_FORM_BASED) {
                     doFBA(info);
                 }
-            } else if (mAuthentication == AUTH_TYPE_BASIC) {
+            } else if (mAuthentication == AuthenticationType.WEBDAV_BASIC) {
                 // Nothing to do, we authenticate with every request when
                 // using basic authentication.
-            } else if (mAuthentication == AUTH_TYPE_FORM_BASED) {
+            } else if (mAuthentication == AuthenticationType.WEBDAV_FORM_BASED) {
                 // Our cookie expired, re-authenticate.
                 doFBA(null);
             }
@@ -784,7 +770,7 @@ public class WebDavStore extends Store {
             throw new MessagingException("Error during authentication", ioe);
         }
 
-        return mAuthentication != AUTH_TYPE_NONE;
+        return mAuthentication != AuthenticationType.NONE;
     }
 
     /**
@@ -819,7 +805,7 @@ public class WebDavStore extends Store {
             if (info.statusCode == 401) {
                 // 401 is the "Unauthorized" status code, meaning the server wants
                 // an authentication header for basic authentication.
-                info.requiredAuthType = AUTH_TYPE_BASIC;
+                info.requiredAuthType = AuthenticationType.WEBDAV_BASIC;
             } else if ((info.statusCode >= 200 && info.statusCode < 300) || // Success
                        (info.statusCode >= 300 && info.statusCode < 400) || // Redirect
                        (info.statusCode == 440)) { // Unauthorized
@@ -828,7 +814,7 @@ public class WebDavStore extends Store {
                 // doesn't work, then we'll use the redirection URL for OWA login given
                 // to us by exchange. We can use this to scrape the location of the
                 // authorization URL.
-                info.requiredAuthType = AUTH_TYPE_FORM_BASED;
+                info.requiredAuthType = AuthenticationType.WEBDAV_FORM_BASED;
 
                 if (mAuthPath != null && !mAuthPath.equals("")) {
                     // The user specified their own authentication path, use that.
@@ -961,7 +947,7 @@ public class WebDavStore extends Store {
         }
 
         if (authenticated) {
-            mAuthentication = AUTH_TYPE_FORM_BASED;
+            mAuthentication = AuthenticationType.WEBDAV_FORM_BASED;
             mCachedLoginUrl = loginUrl;
         } else {
             throw new MessagingException("Invalid credentials provided for authentication.");
@@ -1120,11 +1106,11 @@ public class WebDavStore extends Store {
                 }
             }
 
-            if (mAuthentication == AUTH_TYPE_NONE) {
+            if (mAuthentication == AuthenticationType.NONE) {
                 if (!tryAuth || !authenticate()) {
                     throw new MessagingException("Unable to authenticate in sendRequest().");
                 }
-            } else if (mAuthentication == AUTH_TYPE_BASIC) {
+            } else if (mAuthentication == AuthenticationType.WEBDAV_BASIC) {
                 httpmethod.setHeader("Authorization", mAuthString);
             }
 
@@ -1137,7 +1123,7 @@ public class WebDavStore extends Store {
             if (statusCode == 401) {
                 throw new MessagingException("Invalid username or password for Basic authentication.");
             } else if (statusCode == 440) {
-                if (tryAuth && mAuthentication == AUTH_TYPE_FORM_BASED) {
+                if (tryAuth && mAuthentication == AuthenticationType.WEBDAV_FORM_BASED) {
                     // Our cookie expired, re-authenticate.
                     doFBA(null);
                     sendRequest(url, method, messageBody, headers, false);
@@ -1640,7 +1626,7 @@ public class WebDavStore extends Store {
                     HttpEntity entity;
 
                     httpget.setHeader("translate", "f");
-                    if (mAuthentication == AUTH_TYPE_BASIC) {
+                    if (mAuthentication == AuthenticationType.WEBDAV_BASIC) {
                         httpget.setHeader("Authorization", mAuthString);
                     }
                     response = httpclient.executeOverride(httpget, mContext);
@@ -2534,7 +2520,7 @@ public class WebDavStore extends Store {
      */
     private static class ConnectionInfo {
         public int statusCode;
-        public short requiredAuthType;
+        public AuthenticationType requiredAuthType;
         public String guessedAuthUrl;
         public String redirectUrl;
     }

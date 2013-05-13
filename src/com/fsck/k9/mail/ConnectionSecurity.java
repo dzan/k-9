@@ -11,9 +11,19 @@ package com.fsck.k9.mail;
  * </p>
  */
 public enum ConnectionSecurity {
-    NONE,
-    STARTTLS_OPTIONAL,
-    STARTTLS_REQUIRED,
-    SSL_TLS_OPTIONAL,
-    SSL_TLS_REQUIRED
+    NONE(""),
+    STARTTLS_OPTIONAL("tls"),
+    STARTTLS_REQUIRED("tls"),
+    SSL_TLS_OPTIONAL("ssl"),
+    SSL_TLS_REQUIRED("ssl");
+
+    private String schemeName;
+
+    ConnectionSecurity(String schemeName) {
+        this.schemeName = schemeName;
+    }
+
+    public String getSchemeName() {
+        return schemeName;
+    }
 }

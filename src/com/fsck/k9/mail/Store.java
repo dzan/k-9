@@ -8,7 +8,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import android.app.Application;
 import android.content.Context;
 
+import android.util.Log;
 import com.fsck.k9.Account;
+import com.fsck.k9.K9;
+import com.fsck.k9.activity.setup.autoconfiguration.EmailConfigurationData;
 import com.fsck.k9.mail.store.ImapStore;
 import com.fsck.k9.mail.store.LocalStore;
 import com.fsck.k9.mail.store.Pop3Store;
@@ -44,6 +47,23 @@ public abstract class Store {
      * @see #getLocalInstance(Account, Application)
      */
     private static ConcurrentHashMap<String, Object> sAccountLocks = new ConcurrentHashMap<String, Object>();
+
+    /**
+     * Get an instance of a remote mail store based on information provided by EmailConfigurationData objects
+     */
+    public synchronized  static Store getRemoteInstance(EmailConfigurationData.ParcelableServerSettings serverData) {
+        switch (serverData.type) {
+            case IMAP:
+                return new ImapStore(serverData);
+            case POP3:
+                return new Pop3Store(serverData);
+            case WEBDAV:
+                return new WebDavStore(serverData);
+            default:
+                Log.e(K9.LOG_TAG, "Failed trying to create remote store of unknown type: " + serverData.type.toString());
+                return null;
+        }
+    }
 
     /**
      * Get an instance of a remote mail store.

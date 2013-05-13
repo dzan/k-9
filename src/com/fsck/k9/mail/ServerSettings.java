@@ -1,8 +1,6 @@
 package com.fsck.k9.mail;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import android.os.Bundle;
 import com.fsck.k9.Account;
 
 /**
@@ -17,59 +15,84 @@ import com.fsck.k9.Account;
  * @see Account#getTransportUri()
  */
 public class ServerSettings {
+
+    /**
+     * Some known extra options
+     */
+    // IMAP
+    public static final String IMAP_AUTODETECT_NAMESPACE_KEY = "autoDetectNamespace";               // boolean
+    public static final String IMAP_PATH_PREFIX_KEY = "pathPrefix";                                 // string
+
+    // POP3
+    public static final String POP3_LEAVE_MESSAGES_ON_SERVER = "pop3LeaveMessagesOnServer";         // ispdb, boolean
+    public static final String POP3_DOWNLOAD_ON_BIFF = "pop3DownloadOnBiff";                        // ispdb, boolean
+    public static final String POP3_DAYS_TO_LEAVE_MESSAGES_ON_SERVER = "pop3DaysToLeaveMessagesOnServer"; // ispdb, int
+    public static final String POP3_CHECK_INTERVAL = "pop3CheckInterval";                           // ispdb, int
+
+    // SMTP
+    public static final String SMTP_RESTRICTION = "smtpRestriction";                                // ispdb, string
+    public static final String SMTP_ADD_THIS_SERVER = "smtpAddThisServer";                          // ispdb, boolean
+    public static final String SMTP_USE_GLOBAL_PREFERRED_SERVER = "smtpUseGlobalPreferredServer";   // ispdb, boolean
+
+    // WEBDAV
+    public static final String WEBDAV_ALIAS_KEY = "alias";                                          // string
+    public static final String WEBDAV_PATH_KEY = "path";                                            // string
+    public static final String WEBDAV_AUTH_PATH_KEY = "authPath";                                   // string
+    public static final String WEBDAV_MAILBOX_PATH_KEY = "mailboxPath";                             // string
+
     /**
      * Name of the store or transport type (e.g. "IMAP").
      */
-    public final String type;
+    public ServerType type;
 
     /**
      * The host name of the server.
      *
      * {@code null} if not applicable for the store or transport.
      */
-    public final String host;
+    public String host;
 
     /**
      * The port number of the server.
      *
      * {@code -1} if not applicable for the store or transport.
      */
-    public final int port;
+    public int port;
 
     /**
      * The type of connection security to be used when connecting to the server.
      *
      * {@link ConnectionSecurity#NONE} if not applicable for the store or transport.
      */
-    public final ConnectionSecurity connectionSecurity;
+    public ConnectionSecurity connectionSecurity;
 
     /**
      * The authentication method to use when connecting to the server.
      *
      * {@code null} if not applicable for the store or transport.
      */
-    public final String authenticationType;
+    public AuthenticationType authenticationType;
 
     /**
      * The username part of the credentials needed to authenticate to the server.
      *
      * {@code null} if not applicable for the store or transport.
      */
-    public final String username;
+    public String username;
 
     /**
      * The password part of the credentials needed to authenticate to the server.
      *
      * {@code null} if not applicable for the store or transport.
      */
-    public final String password;
+    public String password;
 
     /**
      * Store- or transport-specific settings as key/value pair.
      *
      * {@code null} if not applicable for the store or transport.
      */
-    private final Map<String, String> extra;
+    public Bundle extra;
 
 
     /**
@@ -90,8 +113,8 @@ public class ServerSettings {
      * @param password
      *         see {@link ServerSettings#password}
      */
-    public ServerSettings(String type, String host, int port,
-            ConnectionSecurity connectionSecurity, String authenticationType, String username,
+    public ServerSettings(ServerType type, String host, int port,
+            ConnectionSecurity connectionSecurity, AuthenticationType authenticationType, String username,
             String password) {
         this.type = type;
         this.host = host;
@@ -100,7 +123,7 @@ public class ServerSettings {
         this.authenticationType = authenticationType;
         this.username = username;
         this.password = password;
-        this.extra = null;
+        this.extra = new Bundle();
     }
 
     /**
@@ -123,9 +146,9 @@ public class ServerSettings {
      * @param extra
      *         see {@link ServerSettings#extra}
      */
-    public ServerSettings(String type, String host, int port,
-            ConnectionSecurity connectionSecurity, String authenticationType, String username,
-            String password, Map<String, String> extra) {
+    public ServerSettings(ServerType type, String host, int port,
+            ConnectionSecurity connectionSecurity, AuthenticationType authenticationType, String username,
+            String password, Bundle extra) {
         this.type = type;
         this.host = host;
         this.port = port;
@@ -133,8 +156,7 @@ public class ServerSettings {
         this.authenticationType = authenticationType;
         this.username = username;
         this.password = password;
-        this.extra = (extra != null) ?
-                Collections.unmodifiableMap(new HashMap<String, String>(extra)) : null;
+        this.extra = extra;
     }
 
     /**
@@ -145,7 +167,7 @@ public class ServerSettings {
      * @param type
      *         see {@link ServerSettings#type}
      */
-    public ServerSettings(String type) {
+    public ServerSettings(ServerType type) {
         this.type = type;
         host = null;
         port = -1;
@@ -153,7 +175,7 @@ public class ServerSettings {
         authenticationType = null;
         username = null;
         password = null;
-        extra = null;
+        extra = new Bundle();
     }
 
     /**
@@ -161,18 +183,12 @@ public class ServerSettings {
      *
      * @return additional set of settings as key/value pair.
      */
-    public Map<String, String> getExtra() {
+    public Bundle getExtra() {
         return extra;
     }
 
-    protected void putIfNotNull(Map<String, String> map, String key, String value) {
-        if (value != null) {
-            map.put(key, value);
-        }
-    }
-
     public ServerSettings newPassword(String newPassword) {
-        return new ServerSettings(type, host, port, connectionSecurity, authenticationType,
-                username, newPassword);
+        this.password = newPassword;
+        return this;
     }
 }

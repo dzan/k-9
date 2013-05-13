@@ -2,6 +2,9 @@ package com.fsck.k9.mail.store;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import android.os.Bundle;
+import com.fsck.k9.mail.AuthenticationType;
 import com.fsck.k9.mail.ConnectionSecurity;
 import com.fsck.k9.mail.ServerSettings;
 import com.fsck.k9.mail.Store;
@@ -75,12 +78,12 @@ public class ImapStoreUriTest extends TestCase {
 
 
     public void testCreateStoreUriImapPrefix() {
-        Map<String, String> extra = new HashMap<String, String>();
-        extra.put("autoDetectNamespace", "false");
-        extra.put("pathPrefix", "customPathPrefix");
+        Bundle extra = new Bundle();
+        extra.putBoolean(ServerSettings.IMAP_AUTODETECT_NAMESPACE_KEY, false);
+        extra.putString(ServerSettings.IMAP_PATH_PREFIX_KEY, "customPathPrefix");
 
         ServerSettings settings = new ServerSettings(ImapStore.STORE_TYPE, "server", 143,
-                ConnectionSecurity.NONE, "PLAIN", "user", "pass", extra);
+                ConnectionSecurity.NONE, AuthenticationType.PLAIN, "user", "pass", extra);
 
         String uri = Store.createStoreUri(settings);
 
@@ -88,12 +91,12 @@ public class ImapStoreUriTest extends TestCase {
     }
 
     public void testCreateStoreUriImapEmptyPrefix() {
-        Map<String, String> extra = new HashMap<String, String>();
-        extra.put("autoDetectNamespace", "false");
-        extra.put("pathPrefix", "");
+        Bundle extra = new Bundle();
+        extra.putBoolean(ServerSettings.IMAP_AUTODETECT_NAMESPACE_KEY, false);
+        extra.putString(ServerSettings.IMAP_PATH_PREFIX_KEY, "");
 
         ServerSettings settings = new ServerSettings(ImapStore.STORE_TYPE, "server", 143,
-                ConnectionSecurity.NONE, "PLAIN", "user", "pass", extra);
+                ConnectionSecurity.NONE, AuthenticationType.PLAIN, "user", "pass", extra);
 
         String uri = Store.createStoreUri(settings);
 
@@ -102,7 +105,7 @@ public class ImapStoreUriTest extends TestCase {
 
     public void testCreateStoreUriImapNoExtra() {
         ServerSettings settings = new ServerSettings(ImapStore.STORE_TYPE, "server", 143,
-                ConnectionSecurity.NONE, "PLAIN", "user", "pass");
+                ConnectionSecurity.NONE, AuthenticationType.PLAIN, "user", "pass");
 
         String uri = Store.createStoreUri(settings);
 
@@ -110,11 +113,11 @@ public class ImapStoreUriTest extends TestCase {
     }
 
     public void testCreateStoreUriImapAutoDetectNamespace() {
-        Map<String, String> extra = new HashMap<String, String>();
-        extra.put("autoDetectNamespace", "true");
+        Bundle extra = new Bundle();
+        extra.putBoolean(ServerSettings.IMAP_AUTODETECT_NAMESPACE_KEY, true);
 
         ServerSettings settings = new ServerSettings(ImapStore.STORE_TYPE, "server", 143,
-                ConnectionSecurity.NONE, "PLAIN", "user", "pass", extra);
+                ConnectionSecurity.NONE, AuthenticationType.PLAIN, "user", "pass", extra);
 
         String uri = Store.createStoreUri(settings);
 

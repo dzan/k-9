@@ -27,18 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 public class Pop3Store extends Store {
-    public static final String STORE_TYPE = "POP3";
-
-    public static final int CONNECTION_SECURITY_NONE = 0;
-    public static final int CONNECTION_SECURITY_TLS_OPTIONAL = 1;
-    public static final int CONNECTION_SECURITY_TLS_REQUIRED = 2;
-    public static final int CONNECTION_SECURITY_SSL_REQUIRED = 3;
-    public static final int CONNECTION_SECURITY_SSL_OPTIONAL = 4;
-
-    private enum AuthType {
-        PLAIN,
-        CRAM_MD5
-    }
+    public static final ServerType STORE_TYPE = ServerType.POP3;
 
     private static final String STLS_COMMAND = "STLS";
     private static final String USER_COMMAND = "USER";
@@ -110,7 +99,7 @@ public class Pop3Store extends Store {
             port = pop3Uri.getPort();
         }
 
-        String authType = AuthType.PLAIN.name();
+        AuthenticationType authType = AuthenticationType.PLAIN;
         if (pop3Uri.getUserInfo() != null) {
             try {
                 int userIndex = 0, passwordIndex = 1;
@@ -121,7 +110,7 @@ public class Pop3Store extends Store {
                     // after an account was imported (so authType and username are present).
                     userIndex++;
                     passwordIndex++;
-                    authType = userInfoParts[0];
+                    authType = AuthenticationType.valueOf(userInfoParts[0]);
                 }
                 username = URLDecoder.decode(userInfoParts[userIndex], "UTF-8");
                 if (userInfoParts.length > passwordIndex) {
@@ -180,14 +169,7 @@ public class Pop3Store extends Store {
                 break;
         }
 
-        try {
-            AuthType.valueOf(server.authenticationType);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid authentication type (" +
-                    server.authenticationType + ")");
-        }
-
-        String userInfo = server.authenticationType + ":" + userEnc + ":" + passwordEnc;
+        String userInfo = server.authenticationType.name() + ":" + userEnc + ":" + passwordEnc;
         try {
             return new URI(scheme, userInfo, server.host, server.port, null, null,
                     null).toString();
@@ -201,8 +183,8 @@ public class Pop3Store extends Store {
     private int mPort;
     private String mUsername;
     private String mPassword;
-    private AuthType mAuthType;
-    private int mConnectionSecurity;
+    private AuthenticationType mAuthType;
+    private ConnectionSecurity mConnectionSecurity;
     private HashMap<String, Folder> mFolders = new HashMap<String, Folder>();
     private Pop3Capabilities mCapabilities;
 
@@ -213,6 +195,18 @@ public class Pop3Store extends Store {
      */
     private boolean mTopNotSupported;
 
+    public Pop3Store(ServerSettings settings) {
+        super(null);
+
+        mHost = settings.host;
+        mPort = settings.port;
+
+        mConnectionSecurity = settings.connectionSecurity;
+
+        mUsername = settings.username;
+        mPassword = settings.password;
+        mAuthType = settings.authenticationType;
+    }
 
     public Pop3Store(Account account) throws MessagingException {
         super(account);
@@ -227,27 +221,11 @@ public class Pop3Store extends Store {
         mHost = settings.host;
         mPort = settings.port;
 
-        switch (settings.connectionSecurity) {
-        case NONE:
-            mConnectionSecurity = CONNECTION_SECURITY_NONE;
-            break;
-        case STARTTLS_OPTIONAL:
-            mConnectionSecurity = CONNECTION_SECURITY_TLS_OPTIONAL;
-            break;
-        case STARTTLS_REQUIRED:
-            mConnectionSecurity = CONNECTION_SECURITY_TLS_REQUIRED;
-            break;
-        case SSL_TLS_OPTIONAL:
-            mConnectionSecurity = CONNECTION_SECURITY_SSL_OPTIONAL;
-            break;
-        case SSL_TLS_REQUIRED:
-            mConnectionSecurity = CONNECTION_SECURITY_SSL_REQUIRED;
-            break;
-        }
+        mConnectionSecurity = settings.connectionSecurity;
 
         mUsername = settings.username;
         mPassword = settings.password;
-        mAuthType = AuthType.valueOf(settings.authenticationType);
+        mAuthType = settings.authenticationType;
     }
 
     @Override
@@ -323,10 +301,10 @@ public class Pop3Store extends Store {
 
             try {
                 SocketAddress socketAddress = new InetSocketAddress(mHost, mPort);
-                if (mConnectionSecurity == CONNECTION_SECURITY_SSL_REQUIRED ||
-                        mConnectionSecurity == CONNECTION_SECURITY_SSL_OPTIONAL) {
+                if (mConnectionSecurity == ConnectionSecurity.SSL_TLS_REQUIRED ||
+                        mConnectionSecurity == ConnectionSecurity.SSL_TLS_OPTIONAL) {
                     SSLContext sslContext = SSLContext.getInstance("TLS");
-                    final boolean secure = mConnectionSecurity == CONNECTION_SECURITY_SSL_REQUIRED;
+                    final boolean secure = mConnectionSecurity == ConnectionSecurity.SSL_TLS_REQUIRED;
                     sslContext.init(null, new TrustManager[] {
                                         TrustManagerFactory.get(mHost, secure)
                                     }, new SecureRandom());
@@ -347,15 +325,15 @@ public class Pop3Store extends Store {
                 // Eat the banner
                 executeSimpleCommand(null);
 
-                if (mConnectionSecurity == CONNECTION_SECURITY_TLS_OPTIONAL
-                        || mConnectionSecurity == CONNECTION_SECURITY_TLS_REQUIRED) {
+                if (mConnectionSecurity == ConnectionSecurity.STARTTLS_OPTIONAL
+                        || mConnectionSecurity == ConnectionSecurity.STARTTLS_REQUIRED) {
                     mCapabilities = getCapabilities();
 
                     if (mCapabilities.stls) {
                         writeLine(STLS_COMMAND);
 
                         SSLContext sslContext = SSLContext.getInstance("TLS");
-                        boolean secure = mConnectionSecurity == CONNECTION_SECURITY_TLS_REQUIRED;
+                        boolean secure = mConnectionSecurity == ConnectionSecurity.STARTTLS_REQUIRED;
                         sslContext.init(null, new TrustManager[] {
                                             TrustManagerFactory.get(mHost, secure)
                                         }, new SecureRandom());
@@ -367,12 +345,12 @@ public class Pop3Store extends Store {
                         if (!isOpen()) {
                             throw new MessagingException("Unable to connect socket");
                         }
-                    } else if (mConnectionSecurity == CONNECTION_SECURITY_TLS_REQUIRED) {
+                    } else if (mConnectionSecurity == ConnectionSecurity.STARTTLS_REQUIRED) {
                         throw new MessagingException("TLS not supported but required");
                     }
                 }
 
-                if (mAuthType == AuthType.CRAM_MD5) {
+                if (mAuthType == AuthenticationType.CRAM_MD5) {
                     try {
                         String b64Nonce = executeSimpleCommand("AUTH CRAM-MD5").replace("+ ", "");
 

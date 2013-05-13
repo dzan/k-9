@@ -30,22 +30,7 @@ import java.security.SecureRandom;
 import java.util.*;
 
 public class SmtpTransport extends Transport {
-    public static final String TRANSPORT_TYPE = "SMTP";
-
-    public static final int CONNECTION_SECURITY_NONE = 0;
-    public static final int CONNECTION_SECURITY_TLS_OPTIONAL = 1;
-    public static final int CONNECTION_SECURITY_TLS_REQUIRED = 2;
-    public static final int CONNECTION_SECURITY_SSL_REQUIRED = 3;
-    public static final int CONNECTION_SECURITY_SSL_OPTIONAL = 4;
-
-    public static final String AUTH_PLAIN = "PLAIN";
-
-    public static final String AUTH_CRAM_MD5 = "CRAM_MD5";
-
-    public static final String AUTH_LOGIN = "LOGIN";
-
-    public static final String AUTH_AUTOMATIC = "AUTOMATIC";
-
+    public static final ServerType TRANSPORT_TYPE = ServerType.SMTP;
 
     /**
      * Decodes a SmtpTransport URI.
@@ -63,7 +48,7 @@ public class SmtpTransport extends Transport {
         String host;
         int port;
         ConnectionSecurity connectionSecurity;
-        String authenticationType = AUTH_AUTOMATIC;
+        AuthenticationType authenticationType = AuthenticationType.NONE;
         String username = null;
         String password = null;
 
@@ -108,7 +93,7 @@ public class SmtpTransport extends Transport {
                     password = URLDecoder.decode(userInfoParts[1], "UTF-8");
                 }
                 if (userInfoParts.length > 2) {
-                    authenticationType = userInfoParts[2];
+                    authenticationType = AuthenticationType.valueOf(userInfoParts[2]);
                 }
             } catch (UnsupportedEncodingException enc) {
                 // This shouldn't happen since the encoding is hardcoded to UTF-8
@@ -164,11 +149,11 @@ public class SmtpTransport extends Transport {
                 break;
         }
 
-        String authType = server.authenticationType;
-        if (!(AUTH_AUTOMATIC.equals(authType) ||
-                AUTH_LOGIN.equals(authType) ||
-                AUTH_PLAIN.equals(authType) ||
-                AUTH_CRAM_MD5.equals(authType))) {
+        AuthenticationType authType = server.authenticationType;
+        if (authType != AuthenticationType.NONE &&
+                authType != AuthenticationType.LOGIN &&
+                authType != AuthenticationType.PLAIN &&
+                authType != AuthenticationType.CRAM_MD5) {
             throw new IllegalArgumentException("Invalid authentication type: " + authType);
         }
 
@@ -187,8 +172,8 @@ public class SmtpTransport extends Transport {
     int mPort;
     String mUsername;
     String mPassword;
-    String mAuthType;
-    int mConnectionSecurity;
+    AuthenticationType mAuthType;
+    ConnectionSecurity mConnectionSecurity;
     Socket mSocket;
     PeekableInputStream mIn;
     OutputStream mOut;
@@ -207,23 +192,7 @@ public class SmtpTransport extends Transport {
         mHost = settings.host;
         mPort = settings.port;
 
-        switch (settings.connectionSecurity) {
-        case NONE:
-            mConnectionSecurity = CONNECTION_SECURITY_NONE;
-            break;
-        case STARTTLS_OPTIONAL:
-            mConnectionSecurity = CONNECTION_SECURITY_TLS_OPTIONAL;
-            break;
-        case STARTTLS_REQUIRED:
-            mConnectionSecurity = CONNECTION_SECURITY_TLS_REQUIRED;
-            break;
-        case SSL_TLS_OPTIONAL:
-            mConnectionSecurity = CONNECTION_SECURITY_SSL_OPTIONAL;
-            break;
-        case SSL_TLS_REQUIRED:
-            mConnectionSecurity = CONNECTION_SECURITY_SSL_REQUIRED;
-            break;
-        }
+        mConnectionSecurity = settings.connectionSecurity;
 
         mAuthType = settings.authenticationType;
         mUsername = settings.username;
@@ -237,10 +206,10 @@ public class SmtpTransport extends Transport {
             for (int i = 0; i < addresses.length; i++) {
                 try {
                     SocketAddress socketAddress = new InetSocketAddress(addresses[i], mPort);
-                    if (mConnectionSecurity == CONNECTION_SECURITY_SSL_REQUIRED ||
-                            mConnectionSecurity == CONNECTION_SECURITY_SSL_OPTIONAL) {
+                    if (mConnectionSecurity == ConnectionSecurity.SSL_TLS_REQUIRED ||
+                            mConnectionSecurity == ConnectionSecurity.SSL_TLS_OPTIONAL) {
                         SSLContext sslContext = SSLContext.getInstance("TLS");
-                        boolean secure = mConnectionSecurity == CONNECTION_SECURITY_SSL_REQUIRED;
+                        boolean secure = mConnectionSecurity == ConnectionSecurity.SSL_TLS_REQUIRED;
                         sslContext.init(null, new TrustManager[] {
                                             TrustManagerFactory.get(mHost, secure)
                                         }, new SecureRandom());
@@ -293,13 +262,13 @@ public class SmtpTransport extends Transport {
             m8bitEncodingAllowed = results.contains("8BITMIME");
 
 
-            if (mConnectionSecurity == CONNECTION_SECURITY_TLS_OPTIONAL
-                    || mConnectionSecurity == CONNECTION_SECURITY_TLS_REQUIRED) {
+            if (mConnectionSecurity == ConnectionSecurity.STARTTLS_OPTIONAL
+                    || mConnectionSecurity == ConnectionSecurity.STARTTLS_REQUIRED) {
                 if (results.contains("STARTTLS")) {
                     executeSimpleCommand("STARTTLS");
 
                     SSLContext sslContext = SSLContext.getInstance("TLS");
-                    boolean secure = mConnectionSecurity == CONNECTION_SECURITY_TLS_REQUIRED;
+                    boolean secure = mConnectionSecurity == ConnectionSecurity.STARTTLS_REQUIRED;
                     sslContext.init(null, new TrustManager[] {
                                         TrustManagerFactory.get(mHost, secure)
                                     }, new SecureRandom());
@@ -313,14 +282,14 @@ public class SmtpTransport extends Transport {
                      * Exim.
                      */
                     results = sendHello(localHost);
-                } else if (mConnectionSecurity == CONNECTION_SECURITY_TLS_REQUIRED) {
+                } else if (mConnectionSecurity == ConnectionSecurity.STARTTLS_REQUIRED) {
                     throw new MessagingException("TLS not supported but required");
                 }
             }
 
-            boolean useAuthLogin = AUTH_LOGIN.equals(mAuthType);
-            boolean useAuthPlain = AUTH_PLAIN.equals(mAuthType);
-            boolean useAuthCramMD5 = AUTH_CRAM_MD5.equals(mAuthType);
+            boolean useAuthLogin = (mAuthType == AuthenticationType.LOGIN);
+            boolean useAuthPlain = (mAuthType == AuthenticationType.PLAIN);
+            boolean useAuthCramMD5 = (mAuthType == AuthenticationType.CRAM_MD5);
 
             // Automatically choose best authentication method if none was explicitly selected
             boolean useAutomaticAuth = !(useAuthLogin || useAuthPlain || useAuthCramMD5);

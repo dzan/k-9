@@ -1,7 +1,9 @@
 package com.fsck.k9.mail.transport.imap;
 
+import com.fsck.k9.activity.setup.autoconfiguration.EmailConfigurationData;
+import com.fsck.k9.mail.AuthenticationType;
+import com.fsck.k9.mail.ConnectionSecurity;
 import com.fsck.k9.mail.store.ImapStore;
-import com.fsck.k9.mail.store.ImapStore.AuthType;
 import com.fsck.k9.mail.store.ImapStore.ImapConnection;
 
 /**
@@ -12,9 +14,9 @@ public interface ImapSettings {
 
     int getPort();
 
-    int getConnectionSecurity();
+    ConnectionSecurity getConnectionSecurity();
 
-    AuthType getAuthType();
+    AuthenticationType getAuthType();
 
     String getUsername();
 

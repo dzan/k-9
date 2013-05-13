@@ -5,14 +5,11 @@ import android.util.Log;
 
 import com.fsck.k9.Account;
 import com.fsck.k9.K9;
-import com.fsck.k9.mail.Message;
-import com.fsck.k9.mail.MessagingException;
-import com.fsck.k9.mail.ServerSettings;
-import com.fsck.k9.mail.Transport;
+import com.fsck.k9.mail.*;
 import com.fsck.k9.mail.store.WebDavStore;
 
 public class WebDavTransport extends Transport {
-    public static final String TRANSPORT_TYPE = WebDavStore.STORE_TYPE;
+    public static final ServerType TRANSPORT_TYPE = ServerType.WEBDAV;
 
     /**
      * Decodes a WebDavTransport URI.

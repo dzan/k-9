@@ -51,18 +51,30 @@ public abstract class Store {
     /**
      * Get an instance of a remote mail store based on information provided by EmailConfigurationData objects
      */
-    public synchronized  static Store getRemoteInstance(EmailConfigurationData.ParcelableServerSettings serverData) {
+    public synchronized static Store getRemoteInstance(ServerSettings serverData) {
+        Store store = sStores.get(serverData.getHash());
+
+        if (store != null) {
+            return store;
+        }
+
         switch (serverData.type) {
             case IMAP:
-                return new ImapStore(serverData);
+                store =  new ImapStore(serverData);
+                break;
             case POP3:
-                return new Pop3Store(serverData);
+                store = new Pop3Store(serverData);
+                break;
             case WEBDAV:
-                return new WebDavStore(serverData);
+                store = new WebDavStore(serverData);
+                break;
             default:
                 Log.e(K9.LOG_TAG, "Failed trying to create remote store of unknown type: " + serverData.type.toString());
-                return null;
+                store = null;
         }
+
+        sStores.put(serverData.getHash(), store);
+        return store;
     }
 
     /**

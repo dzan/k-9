@@ -102,6 +102,8 @@ public class ImapStore extends Store {
 
     private static int FETCH_WINDOW_SIZE = 100;
 
+    private static final boolean COMPRESSION_DEFAULT = true;
+
     private Set<Flag> mPermanentFlagsIndex = new HashSet<Flag>();
 
     private static final String CAPABILITY_IDLE = "IDLE";
@@ -348,7 +350,11 @@ public class ImapStore extends Store {
 
         @Override
         public boolean useCompression(final int type) {
-            return mAccount.useCompression(type);
+            if (mAccount != null) {
+                return mAccount.useCompression(type);
+            } else {
+                return COMPRESSION_DEFAULT;
+            }
         }
 
         @Override
@@ -611,6 +617,14 @@ public class ImapStore extends Store {
         final List<ImapResponse> responses =
             connection.executeSimpleCommand(String.format("%s%s \"\" %s", commandResponse, commandOptions,
                 encodeString(getCombinedPrefix() + "*")));
+
+        /*
+            if there is no account consider this a dry-run ( for example testing the settings )
+            we don't need to go parsing the results in that case
+         */
+        if (mAccount == null) {
+            return;
+        }
 
         for (ImapResponse response : responses) {
             if (ImapResponseParser.equalsIgnoreCase(response.get(0), commandResponse)) {

@@ -54,6 +54,11 @@ public class Account implements BaseAccount {
     public static final String INBOX = "INBOX";
 
     /**
+     * Default value for the drafts folder
+     */
+    public static final String DRAFTS = "Drafts";
+
+    /**
      * This local folder is used to store messages to be sent.
      */
     public static final String OUTBOX = "K9MAIL_INTERNAL_OUTBOX";
@@ -391,7 +396,7 @@ public class Account implements BaseAccount {
         mNotifySync = prefs.getBoolean(mUuid + ".notifyMailCheck", false);
         mDeletePolicy = prefs.getInt(mUuid + ".deletePolicy", 0);
         mInboxFolderName = prefs.getString(mUuid  + ".inboxFolderName", INBOX);
-        mDraftsFolderName = prefs.getString(mUuid  + ".draftsFolderName", "Drafts");
+        mDraftsFolderName = prefs.getString(mUuid  + ".draftsFolderName", DRAFTS);
         mSentFolderName = prefs.getString(mUuid  + ".sentFolderName", "Sent");
         mTrashFolderName = prefs.getString(mUuid  + ".trashFolderName", "Trash");
         mArchiveFolderName = prefs.getString(mUuid  + ".archiveFolderName", "Archive");

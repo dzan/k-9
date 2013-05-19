@@ -411,6 +411,14 @@ public class WebDavStore extends Store {
         headers.put("Brief", "t");
         dataset = processRequest(this.mUrl, "PROPFIND", getSpecialFoldersList(), headers);
 
+        /*
+            if there is no account consider this a dry-run ( for example testing the settings )
+            we return an empty folderlist in that case
+         */
+        if (mAccount == null) {
+            return folderList;
+        }
+
         HashMap<String, String> specialFoldersMap = dataset.getSpecialFolderToUrl();
         String folderName = getFolderName(specialFoldersMap.get(DAV_MAIL_INBOX_FOLDER));
         if (folderName != null) {
@@ -1241,7 +1249,8 @@ public class WebDavStore extends Store {
 
     @Override
     public void sendMessages(Message[] messages) throws MessagingException {
-        WebDavFolder tmpFolder = (WebDavStore.WebDavFolder) getFolder(mAccount.getDraftsFolderName());
+        WebDavFolder tmpFolder = (WebDavStore.WebDavFolder) getFolder(
+                (mAccount != null) ? mAccount.getDraftsFolderName() : Account.DRAFTS);
         try {
             tmpFolder.open(OpenMode.READ_WRITE);
             Message[] retMessages = tmpFolder.appendWebDavMessages(messages);
@@ -1569,7 +1578,7 @@ public class WebDavStore extends Store {
             }
 
             if (fp.contains(FetchProfile.Item.BODY_SANE)) {
-                if (mAccount.getMaximumAutoDownloadMessageSize() > 0) {
+                if (mAccount != null && mAccount.getMaximumAutoDownloadMessageSize() > 0) {
                     fetchMessages(messages, listener, (mAccount.getMaximumAutoDownloadMessageSize() / 76));
                 } else {
                     fetchMessages(messages, listener, -1);

@@ -241,13 +241,19 @@ public class Pop3Store extends Store {
     @Override
     public List <? extends Folder > getPersonalNamespaces(boolean forceListAll) throws MessagingException {
         List<Folder> folders = new LinkedList<Folder>();
-        folders.add(getFolder(mAccount.getInboxFolderName()));
+        folders.add(getFolder((mAccount != null) ? mAccount.getInboxFolderName() : Account.INBOX));
         return folders;
     }
 
     @Override
     public void checkSettings() throws MessagingException {
-        Pop3Folder folder = new Pop3Folder(mAccount.getInboxFolderName());
+        Pop3Folder folder;
+        if (mAccount != null) {
+            folder = new Pop3Folder(mAccount.getInboxFolderName());
+        } else {
+            folder = new Pop3Folder(Account.INBOX);
+        }
+
         folder.open(OpenMode.READ_WRITE);
         if (!mCapabilities.uidl) {
             /*
@@ -284,7 +290,7 @@ public class Pop3Store extends Store {
             super(Pop3Store.this.mAccount);
             this.mName = name;
 
-            if (mName.equalsIgnoreCase(mAccount.getInboxFolderName())) {
+            if (mName.equalsIgnoreCase((mAccount != null) ? mAccount.getInboxFolderName() : Account.INBOX)) {
                 mName = mAccount.getInboxFolderName();
             }
         }
@@ -295,7 +301,7 @@ public class Pop3Store extends Store {
                 return;
             }
 
-            if (!mName.equalsIgnoreCase(mAccount.getInboxFolderName())) {
+            if (!mName.equalsIgnoreCase((mAccount != null) ? mAccount.getInboxFolderName() : Account.INBOX)) {
                 throw new MessagingException("Folder does not exist");
             }
 
@@ -454,7 +460,7 @@ public class Pop3Store extends Store {
 
         @Override
         public boolean exists() throws MessagingException {
-            return mName.equalsIgnoreCase(mAccount.getInboxFolderName());
+            return mName.equalsIgnoreCase((mAccount != null) ? mAccount.getInboxFolderName() : Account.INBOX);
         }
 
         @Override
@@ -713,7 +719,7 @@ public class Pop3Store extends Store {
                          * To convert the suggested download size we take the size
                          * divided by the maximum line size (76).
                          */
-                        if (mAccount.getMaximumAutoDownloadMessageSize() > 0) {
+                        if (mAccount != null && mAccount.getMaximumAutoDownloadMessageSize() > 0) {
                             fetchBody(pop3Message,
                                       (mAccount.getMaximumAutoDownloadMessageSize() / 76));
                         } else {

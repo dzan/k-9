@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<resources xmlns:tools="http://schemas.android.com/tools"
+           tools:ignore="TypographyDashes">
+    <!--Replace placeholder ID with your tracking ID-->
+    <string name="ga_trackingId">UA-42568268-1</string>
+
+    <!--Enable automatic activity tracking-->
+    <bool name="ga_autoActivityTracking">true</bool>
+
+    <!--Enable automatic exception tracking-->
+    <bool name="ga_reportUncaughtExceptions">true</bool>
+
+    <!--Enable debug output-->
+    <bool name="ga_debug">true</bool>
+
+    <!--Rename the activities for clarity in the analytics console-->
+    <string name="com.com.fsck.activity.Accounts">Account List</string>
+    <string name="com.com.fsck.activity.FolderList">Folder List</string>
+    <string name="com.com.fsck.activity.MessageCompose">Compose Message</string>
+    <string name="analytics_screen_messageview">Message View</string>
+    <string name="analytics_screen_messagelist">Message List</string>
+
+    <string name="com.com.fsck.activity.setup.AccountSettings">Account Settings</string>
+    <string name="com.com.fsck.activity.setup.FolderSettings">Folder Settings</string>
+    <string name="com.com.fsck.activity.setup.Prefs">Global Settings</string>
+    <string name="com.com.fsck.activity.setup.FontSizeSettings">Font Size Settings</string>
+
+    <string name="com.com.fsck.activity.ChooseIdentity">Pick Identity</string>
+
+    <!-- ============================================================
+                Analytics Strings
+    ============================================================= -->
+    <!-- Categories -->
+    <string name="analytics_category_feature_usage">Feature Usage</string>
+    <string name="analytics_category_ui_interaction">UI Interaction</string>
+    <string name="analytics_category_issue">Issue</string>
+
+    <!-- Actions -->
+    <string name="analytics_action_open_category">Open Category</string>
+    <string name="analytics_action_open_contact">Open Contact</string>
+    <string name="analytics_action_play_services">Play Services Missing</string>
+    <string name="analytics_action_reply">Reply</string>
+    <string name="analytics_action_reply_all">Reply All</string>
+    <string name="analytics_action_forward">Forward</string>
+    <string name="analytics_action_share">Share</string>
+    <string name="analytics_action_archive">Archive</string>
+    <string name="analytics_action_spam">Spam</string>
+    <string name="analytics_action_sort">Sort</string>
+    <string name="analytics_action_delete">Delete</string>
+    <string name="analytics_action_move">Move</string>
+    <string name="analytics_action_copy">Copy</string>
+    <string name="analytics_action_read">Toggle Read</string>
+    <string name="analytics_action_search">Search</string>
+    <string name="analytics_action_check_mail">Check Mail</string>
+    <string name="analytics_action_star">Toggle Star</string>
+    <string name="analytics_action_same_sender">Same Sender</string>
+    <string name="analytics_action_show_headers">Show Headers</string>
+    <string name="analytics_action_compose">Compose</string>
+
+    <!-- Labels -->
+    <string name="analytics_label_msglist">Message List</string>
+    <string name="analytics_label_accounts">Account List</string>
+    <string name="analytics_label_msglist_context_menu">Context Menu (Message List)</string>
+    <string name="analytics_label_msgview">Message View</string>
+    <string name="analytics_label_splitview">Split View</string>
+    <string name="analytics_label_folderlist">Folder List</string>
+    <string name="analytics_label_msgcompose">Message Compose</string>
+
+    <string name="analytics_label_unrecoverable">Unrecoverable</string>
+
+    <string name="analytics_label_sort_date">Sort Date</string>
+    <string name="analytics_label_sort_flag">Sort Flag</string>
+    <string name="analytics_label_sort_attach">Sort Attach</string>
+    <string name="analytics_label_sort_unread">Sort Unread</string>
+</resources>

@@ -87,6 +87,7 @@ import com.fsck.k9.preferences.SettingsImporter.AccountDescription;
 import com.fsck.k9.preferences.SettingsImporter.AccountDescriptionPair;
 import com.fsck.k9.preferences.SettingsImporter.ImportContents;
 import com.fsck.k9.preferences.SettingsImporter.ImportResults;
+import com.google.analytics.tracking.android.EasyTracker;
 
 import de.cketti.library.changelog.ChangeLog;
 
@@ -520,6 +521,18 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
         MessagingController.getInstance(getApplication()).removeListener(mListener);
         StorageManager.getInstance(getApplication()).removeListener(storageListener);
         mListener.onPause(this);
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        EasyTracker.getInstance().activityStart(this); // Add this method.
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        EasyTracker.getInstance().activityStop(this); // Add this method.
     }
 
     /**
@@ -1196,6 +1209,13 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
         onOpenAccount(account);
     }
 
+    private void sendAnalyticsEvent(String event) {
+        EasyTracker.getTracker().sendEvent(
+                getString(R.string.analytics_category_ui_interaction),
+                event,
+                getString(R.string.analytics_label_accounts), null);
+    }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
@@ -1206,15 +1226,18 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
             onEditPrefs();
             break;
         case R.id.check_mail:
+            sendAnalyticsEvent(getString(R.string.analytics_action_check_mail));
             onCheckMail(null);
             break;
         case R.id.compose:
+            sendAnalyticsEvent(getString(R.string.analytics_action_compose));
             onCompose();
             break;
         case R.id.about:
             onAbout();
             break;
         case R.id.search:
+            sendAnalyticsEvent(getString(R.string.analytics_action_search));
             onSearchRequested();
             break;
         case R.id.export_all:

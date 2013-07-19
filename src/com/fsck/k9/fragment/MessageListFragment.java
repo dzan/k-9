@@ -100,6 +100,7 @@ import com.fsck.k9.search.SearchSpecification;
 import com.fsck.k9.search.SearchSpecification.SearchCondition;
 import com.fsck.k9.search.SearchSpecification.Searchfield;
 import com.fsck.k9.search.SqlQueryBuilder;
+import com.google.analytics.tracking.android.EasyTracker;
 import com.handmark.pulltorefresh.library.ILoadingLayout;
 import com.handmark.pulltorefresh.library.PullToRefreshBase;
 import com.handmark.pulltorefresh.library.PullToRefreshListView;
@@ -795,6 +796,7 @@ public class MessageListFragment extends SherlockFragment implements OnItemClick
         createCacheBroadcastReceiver(appContext);
 
         mInitialized = true;
+        EasyTracker.getInstance().setContext(getActivity());
     }
 
     @Override
@@ -1457,6 +1459,13 @@ public class MessageListFragment extends SherlockFragment implements OnItemClick
         mController.sendPendingMessages(mAccount, null);
     }
 
+    private void sendAnalyticsContextMenuEvent(String event) {
+        EasyTracker.getTracker().sendEvent(
+                getString(R.string.analytics_category_ui_interaction),
+                event,
+                getString(R.string.analytics_label_msglist_context_menu), null);
+    }
+
     @Override
     public boolean onContextItemSelected(android.view.MenuItem item) {
         if (mContextMenuUniqueId == 0) {
@@ -1470,27 +1479,32 @@ public class MessageListFragment extends SherlockFragment implements OnItemClick
 
         switch (item.getItemId()) {
             case R.id.reply: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_reply));
                 Message message = getMessageAtPosition(adapterPosition);
                 onReply(message);
                 break;
             }
             case R.id.reply_all: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_reply_all));
                 Message message = getMessageAtPosition(adapterPosition);
                 onReplyAll(message);
                 break;
             }
             case R.id.forward: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_forward));
                 Message message = getMessageAtPosition(adapterPosition);
                 onForward(message);
                 break;
             }
             case R.id.send_again: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_send_again));
                 Message message = getMessageAtPosition(adapterPosition);
                 onResendMessage(message);
                 mSelectedCount = 0;
                 break;
             }
             case R.id.same_sender: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_same_sender));
                 Cursor cursor = (Cursor) mAdapter.getItem(adapterPosition);
                 String senderAddress = getSenderAddressFromCursor(cursor);
                 if (senderAddress != null) {
@@ -1499,44 +1513,53 @@ public class MessageListFragment extends SherlockFragment implements OnItemClick
                 break;
             }
             case R.id.delete: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_delete));
                 Message message = getMessageAtPosition(adapterPosition);
                 onDelete(message);
                 break;
             }
             case R.id.mark_as_read: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_read));
                 setFlag(adapterPosition, Flag.SEEN, true);
                 break;
             }
             case R.id.mark_as_unread: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_read));
                 setFlag(adapterPosition, Flag.SEEN, false);
                 break;
             }
             case R.id.flag: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_star));
                 setFlag(adapterPosition, Flag.FLAGGED, true);
                 break;
             }
             case R.id.unflag: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_star));
                 setFlag(adapterPosition, Flag.FLAGGED, false);
                 break;
             }
 
             // only if the account supports this
             case R.id.archive: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_archive));
                 Message message = getMessageAtPosition(adapterPosition);
                 onArchive(message);
                 break;
             }
             case R.id.spam: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_spam));
                 Message message = getMessageAtPosition(adapterPosition);
                 onSpam(message);
                 break;
             }
             case R.id.move: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_move));
                 Message message = getMessageAtPosition(adapterPosition);
                 onMove(message);
                 break;
             }
             case R.id.copy: {
+                sendAnalyticsContextMenuEvent(getString(R.string.analytics_action_copy));
                 Message message = getMessageAtPosition(adapterPosition);
                 onCopy(message);
                 break;
@@ -2762,6 +2785,14 @@ public class MessageListFragment extends SherlockFragment implements OnItemClick
             }
         }
 
+        private void sendAnalyticsActionModeEvent(String event) {
+            EasyTracker.getTracker().sendEvent(
+                    getString(R.string.analytics_category_ui_interaction),
+                    event,
+                    getString(R.string.analytics_label_msglist), null);
+        }
+
+
         @Override
         public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
             /*
@@ -2773,24 +2804,29 @@ public class MessageListFragment extends SherlockFragment implements OnItemClick
              */
             switch (item.getItemId()) {
             case R.id.delete: {
+                sendAnalyticsActionModeEvent(getString(R.string.analytics_action_delete));
                 List<Message> messages = getCheckedMessages();
                 onDelete(messages);
                 mSelectedCount = 0;
                 break;
             }
             case R.id.mark_as_read: {
+                sendAnalyticsActionModeEvent(getString(R.string.analytics_action_read));
                 setFlagForSelected(Flag.SEEN, true);
                 break;
             }
             case R.id.mark_as_unread: {
+                sendAnalyticsActionModeEvent(getString(R.string.analytics_action_read));
                 setFlagForSelected(Flag.SEEN, false);
                 break;
             }
             case R.id.flag: {
+                sendAnalyticsActionModeEvent(getString(R.string.analytics_action_star));
                 setFlagForSelected(Flag.FLAGGED, true);
                 break;
             }
             case R.id.unflag: {
+                sendAnalyticsActionModeEvent(getString(R.string.analytics_action_star));
                 setFlagForSelected(Flag.FLAGGED, false);
                 break;
             }
@@ -2801,24 +2837,28 @@ public class MessageListFragment extends SherlockFragment implements OnItemClick
 
             // only if the account supports this
             case R.id.archive: {
+                sendAnalyticsActionModeEvent(getString(R.string.analytics_action_archive));
                 List<Message> messages = getCheckedMessages();
                 onArchive(messages);
                 mSelectedCount = 0;
                 break;
             }
             case R.id.spam: {
+                sendAnalyticsActionModeEvent(getString(R.string.analytics_action_spam));
                 List<Message> messages = getCheckedMessages();
                 onSpam(messages);
                 mSelectedCount = 0;
                 break;
             }
             case R.id.move: {
+                sendAnalyticsActionModeEvent(getString(R.string.analytics_action_move));
                 List<Message> messages = getCheckedMessages();
                 onMove(messages);
                 mSelectedCount = 0;
                 break;
             }
             case R.id.copy: {
+                sendAnalyticsActionModeEvent(getString(R.string.analytics_action_copy));
                 List<Message> messages = getCheckedMessages();
                 onCopy(messages);
                 mSelectedCount = 0;

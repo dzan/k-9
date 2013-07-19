@@ -54,6 +54,7 @@ import com.fsck.k9.view.MessageHeader;
 import com.fsck.k9.view.MessageTitleView;
 import com.fsck.k9.view.ViewSwitcher;
 import com.fsck.k9.view.ViewSwitcher.OnSwitchCompleteListener;
+import com.google.analytics.tracking.android.EasyTracker;
 
 import de.cketti.library.changelog.ChangeLog;
 
@@ -500,6 +501,21 @@ public class MessageList extends K9FragmentActivity implements MessageListFragme
             return;
         }
         StorageManager.getInstance(getApplication()).addListener(mStorageListener);
+
+        EasyTracker.getInstance().setContext(this);
+        EasyTracker.getTracker().sendView(mDisplayMode.name());
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        EasyTracker.getInstance().activityStart(this);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        EasyTracker.getInstance().activityStop(this);
     }
 
     @Override
@@ -754,6 +770,25 @@ public class MessageList extends K9FragmentActivity implements MessageListFragme
         return mMessageListFragment.onSearchRequested();
     }
 
+    private void sendAnalyticsActionEvent(String event) {
+        String label = getString(R.string.analytics_label_splitview);
+        if (mDisplayMode == DisplayMode.MESSAGE_LIST) {
+            label = getString(R.string.analytics_label_msglist);
+        } else if (mDisplayMode == DisplayMode.MESSAGE_VIEW){
+            label = getString(R.string.analytics_label_msgview);
+        }
+
+        EasyTracker.getTracker().sendEvent(
+                getString(R.string.analytics_category_ui_interaction),
+                event, label, null);
+    }
+
+    private void sendAnalyticsSortUsage(String type) {
+        EasyTracker.getTracker().sendEvent(
+                getString(R.string.analytics_category_feature_usage),
+                getString(R.string.analytics_action_sort), type, null);
+    }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int itemId = item.getItemId();
@@ -763,6 +798,7 @@ public class MessageList extends K9FragmentActivity implements MessageListFragme
                 return true;
             }
             case R.id.compose: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_compose));
                 mMessageListFragment.onCompose();
                 return true;
             }
@@ -772,34 +808,42 @@ public class MessageList extends K9FragmentActivity implements MessageListFragme
             }
             // MessageList
             case R.id.check_mail: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_check_mail));
                 mMessageListFragment.checkMail();
                 return true;
             }
             case R.id.set_sort_date: {
+                sendAnalyticsSortUsage(getString(R.string.analytics_label_sort_date));
                 mMessageListFragment.changeSort(SortType.SORT_DATE);
                 return true;
             }
             case R.id.set_sort_arrival: {
+                sendAnalyticsSortUsage(getString(R.string.analytics_label_sort_arrival));
                 mMessageListFragment.changeSort(SortType.SORT_ARRIVAL);
                 return true;
             }
             case R.id.set_sort_subject: {
+                sendAnalyticsSortUsage(getString(R.string.analytics_label_sort_subject));
                 mMessageListFragment.changeSort(SortType.SORT_SUBJECT);
                 return true;
             }
             case R.id.set_sort_sender: {
+                sendAnalyticsSortUsage(getString(R.string.analytics_label_sort_sender));
                 mMessageListFragment.changeSort(SortType.SORT_SENDER);
                 return true;
             }
             case R.id.set_sort_flag: {
+                sendAnalyticsSortUsage(getString(R.string.analytics_label_sort_flag));
                 mMessageListFragment.changeSort(SortType.SORT_FLAGGED);
                 return true;
             }
             case R.id.set_sort_unread: {
+                sendAnalyticsSortUsage(getString(R.string.analytics_label_sort_unread));
                 mMessageListFragment.changeSort(SortType.SORT_UNREAD);
                 return true;
             }
             case R.id.set_sort_attach: {
+                sendAnalyticsSortUsage(getString(R.string.analytics_label_sort_attach));
                 mMessageListFragment.changeSort(SortType.SORT_ATTACHMENT);
                 return true;
             }
@@ -816,6 +860,7 @@ public class MessageList extends K9FragmentActivity implements MessageListFragme
                 return true;
             }
             case R.id.search: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_search));
                 mMessageListFragment.onSearchRequested();
                 return true;
             }
@@ -841,42 +886,52 @@ public class MessageList extends K9FragmentActivity implements MessageListFragme
                 return true;
             }
             case R.id.delete: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_delete));
                 mMessageViewFragment.onDelete();
                 return true;
             }
             case R.id.reply: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_reply));
                 mMessageViewFragment.onReply();
                 return true;
             }
             case R.id.reply_all: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_reply_all));
                 mMessageViewFragment.onReplyAll();
                 return true;
             }
             case R.id.forward: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_forward));
                 mMessageViewFragment.onForward();
                 return true;
             }
             case R.id.share: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_share));
                 mMessageViewFragment.onSendAlternate();
                 return true;
             }
             case R.id.toggle_unread: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_read));
                 mMessageViewFragment.onToggleRead();
                 return true;
             }
             case R.id.archive: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_archive));
                 mMessageViewFragment.onArchive();
                 return true;
             }
             case R.id.spam: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_spam));
                 mMessageViewFragment.onSpam();
                 return true;
             }
             case R.id.move: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_move));
                 mMessageViewFragment.onMove();
                 return true;
             }
             case R.id.copy: {
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_copy));
                 mMessageViewFragment.onCopy();
                 return true;
             }
@@ -885,6 +940,7 @@ public class MessageList extends K9FragmentActivity implements MessageListFragme
                 return true;
             }
             case R.id.show_headers:
+                sendAnalyticsActionEvent(getString(R.string.analytics_action_show_headers));
             case R.id.hide_headers: {
                 mMessageViewFragment.onToggleAllHeadersView();
                 updateMenu();

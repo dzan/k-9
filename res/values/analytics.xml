@@ -37,9 +37,6 @@
     <string name="analytics_category_issue">Issue</string>
 
     <!-- Actions -->
-    <string name="analytics_action_open_category">Open Category</string>
-    <string name="analytics_action_open_contact">Open Contact</string>
-    <string name="analytics_action_play_services">Play Services Missing</string>
     <string name="analytics_action_reply">Reply</string>
     <string name="analytics_action_reply_all">Reply All</string>
     <string name="analytics_action_forward">Forward</string>
@@ -57,6 +54,7 @@
     <string name="analytics_action_same_sender">Same Sender</string>
     <string name="analytics_action_show_headers">Show Headers</string>
     <string name="analytics_action_compose">Compose</string>
+    <string name="analytics_action_send_again">Send Again</string>
 
     <!-- Labels -->
     <string name="analytics_label_msglist">Message List</string>
@@ -71,6 +69,9 @@
 
     <string name="analytics_label_sort_date">Sort Date</string>
     <string name="analytics_label_sort_flag">Sort Flag</string>
+    <string name="analytics_label_sort_subject">Sort Subject</string>
+    <string name="analytics_label_sort_sender">Sort Sender</string>
+    <string name="analytics_label_sort_arrival">Sort Arrival</string>
     <string name="analytics_label_sort_attach">Sort Attach</string>
     <string name="analytics_label_sort_unread">Sort Unread</string>
 </resources>

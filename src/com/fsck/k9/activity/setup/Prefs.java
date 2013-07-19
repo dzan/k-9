@@ -38,6 +38,7 @@ import com.fsck.k9.preferences.TimePickerPreference;
 
 import com.fsck.k9.service.MailService;
 import com.fsck.k9.view.MessageWebView;
+import com.google.analytics.tracking.android.EasyTracker;
 
 
 public class Prefs extends K9PreferenceActivity {
@@ -499,6 +500,18 @@ public class Prefs extends K9PreferenceActivity {
     protected void onPause() {
         saveSettings();
         super.onPause();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        EasyTracker.getInstance().activityStart(this);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        EasyTracker.getInstance().activityStop(this);
     }
 
     private void onFontSizeSettings() {

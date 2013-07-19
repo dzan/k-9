@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.preference.*;
 import com.fsck.k9.*;
 import com.fsck.k9.activity.K9PreferenceActivity;
+import com.google.analytics.tracking.android.EasyTracker;
 
 /**
  * Activity to configure the font size of the information displayed in the
@@ -164,4 +165,17 @@ public class FontSizeSettings extends K9PreferenceActivity {
         saveSettings();
         super.onBackPressed();
     }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        EasyTracker.getInstance().activityStart(this);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        EasyTracker.getInstance().activityStop(this);
+    }
+
 }

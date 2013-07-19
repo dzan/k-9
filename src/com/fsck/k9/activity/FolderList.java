@@ -60,6 +60,7 @@ import com.fsck.k9.search.LocalSearch;
 import com.fsck.k9.search.SearchSpecification.Attribute;
 import com.fsck.k9.search.SearchSpecification.Searchfield;
 import com.fsck.k9.service.MailService;
+import com.google.analytics.tracking.android.EasyTracker;
 
 import de.cketti.library.changelog.ChangeLog;
 
@@ -344,6 +345,18 @@ public class FolderList extends K9ListActivity {
         return (mAdapter == null) ? null : mAdapter.mFolders;
     }
 
+    @Override
+    public void onStart() {
+        super.onStart();
+        EasyTracker.getInstance().activityStart(this);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        EasyTracker.getInstance().activityStop(this);
+    }
+
     @Override public void onPause() {
         super.onPause();
         MessagingController.getInstance(getApplication()).removeListener(mAdapter.mListener);
@@ -486,7 +499,15 @@ public class FolderList extends K9ListActivity {
         MessagingController.getInstance(getApplication()).sendPendingMessages(account, mAdapter.mListener);
     }
 
-    @Override public boolean onOptionsItemSelected(MenuItem item) {
+    private void sendAnalyticsEvent(String event) {
+        EasyTracker.getTracker().sendEvent(
+                getString(R.string.analytics_category_ui_interaction),
+                event,
+                getString(R.string.analytics_label_folderlist), null);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
         case android.R.id.home:
             onAccounts();
@@ -494,16 +515,19 @@ public class FolderList extends K9ListActivity {
             return true;
 
         case R.id.search:
+            sendAnalyticsEvent(getString(R.string.analytics_action_search));
             onSearchRequested();
 
             return true;
 
         case R.id.compose:
+            sendAnalyticsEvent(getString(R.string.analytics_action_compose));
             MessageCompose.actionCompose(this, mAccount);
 
             return true;
 
         case R.id.check_mail:
+            sendAnalyticsEvent(getString(R.string.analytics_action_check_mail));
             MessagingController.getInstance(getApplication()).checkMail(this, mAccount, true, true, mAdapter.mListener);
 
             return true;

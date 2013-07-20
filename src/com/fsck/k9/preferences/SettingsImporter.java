@@ -293,6 +293,7 @@ public class SettingsImporter {
 
             preferences.loadAccounts();
             K9.loadPrefs(preferences);
+            K9.actOnSettings(context);
             K9.setServicesEnabled(context);
 
             return new ImportResults(globalSettingsImported, importedAccounts, errorneousAccounts);

@@ -63,6 +63,7 @@ public class Prefs extends K9PreferenceActivity {
     private static final String PREFERENCE_START_INTEGRATED_INBOX = "start_integrated_inbox";
     private static final String PREFERENCE_CONFIRM_ACTIONS = "confirm_actions";
     private static final String PREFERENCE_NOTIFICATION_HIDE_SUBJECT = "notification_hide_subject";
+    private static final String PREFERENCE_ENABLE_ANALYTICS = "enable_analytics";
     private static final String PREFERENCE_MEASURE_ACCOUNTS = "measure_accounts";
     private static final String PREFERENCE_COUNT_SEARCH = "count_search";
     private static final String PREFERENCE_HIDE_SPECIAL_ACCOUNTS = "hide_special_accounts";
@@ -109,6 +110,7 @@ public class Prefs extends K9PreferenceActivity {
     private CheckBoxPreference mStartIntegratedInbox;
     private CheckBoxListPreference mConfirmActions;
     private ListPreference mNotificationHideSubject;
+    private CheckBoxPreference mEnableAnalytics;
     private CheckBoxPreference mMeasureAccounts;
     private CheckBoxPreference mCountSearch;
     private CheckBoxPreference mHideSpecialAccounts;
@@ -219,6 +221,9 @@ public class Prefs extends K9PreferenceActivity {
 
         mNotificationHideSubject = setupListPreference(PREFERENCE_NOTIFICATION_HIDE_SUBJECT,
                 K9.getNotificationHideSubject().toString());
+
+        mEnableAnalytics = (CheckBoxPreference)findPreference(PREFERENCE_ENABLE_ANALYTICS);
+        mEnableAnalytics.setChecked(K9.analyticsEnabled());
 
         mMeasureAccounts = (CheckBoxPreference)findPreference(PREFERENCE_MEASURE_ACCOUNTS);
         mMeasureAccounts.setChecked(K9.measureAccounts());
@@ -439,6 +444,7 @@ public class Prefs extends K9PreferenceActivity {
         K9.setUseVolumeKeysForListNavigation(mVolumeNavigation.getCheckedItems()[1]);
         K9.setStartIntegratedInbox(!mHideSpecialAccounts.isChecked() && mStartIntegratedInbox.isChecked());
         K9.setNotificationHideSubject(NotificationHideSubject.valueOf(mNotificationHideSubject.getValue()));
+        K9.setEnableAnalytics(getApplicationContext(), mEnableAnalytics.isChecked());
 
         int index = 0;
         K9.setConfirmDelete(mConfirmActions.getCheckedItems()[index++]);

@@ -341,6 +341,9 @@ Please submit bug reports, contribute new features and ask questions at
     <string name="global_settings_notification_hide_subject_when_locked">When device is locked</string>
     <string name="global_settings_notification_hide_subject_always">Always</string>
 
+    <string name="global_settings_enable_analytics_title">Send back usage information</string>
+    <string name="global_settings_enable_analytics_summary">Enabling this allows your phone to send back non-sensitive usage information allowing the developers to further improve K-9</string>
+
     <string name="global_settings_notification_quick_delete_title">Show \'Delete\' button</string>
     <string name="global_settings_notification_quick_delete_never">Never</string>
     <string name="global_settings_notification_quick_delete_when_single_msg">For single message notification</string>

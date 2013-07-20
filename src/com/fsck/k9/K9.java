@@ -43,6 +43,7 @@ import com.fsck.k9.service.BootReceiver;
 import com.fsck.k9.service.MailService;
 import com.fsck.k9.service.ShutdownReceiver;
 import com.fsck.k9.service.StorageGoneReceiver;
+import com.google.analytics.tracking.android.GoogleAnalytics;
 
 public class K9 extends Application {
     /**
@@ -193,6 +194,7 @@ public class K9 extends Application {
     private static boolean mConfirmDeleteFromNotification = true;
 
     private static NotificationHideSubject sNotificationHideSubject = NotificationHideSubject.NEVER;
+    private static boolean mEnableAnalytics = true; // we force it off asap but on app first launch it's true by design
 
     /**
      * Controls when to hide the subject in the notification area.
@@ -532,6 +534,7 @@ public class K9 extends Application {
 
         editor.putString("notificationHideSubject", sNotificationHideSubject.toString());
         editor.putString("notificationQuickDelete", sNotificationQuickDelete.toString());
+        editor.putBoolean("analyticsEnabled", mEnableAnalytics);
 
         editor.putString("attachmentdefaultpath", mAttachmentDefaultPath);
         editor.putBoolean("useBackgroundAsUnreadIndicator", sUseBackgroundAsUnreadIndicator);
@@ -671,6 +674,14 @@ public class K9 extends Application {
         }
     }
 
+    /**
+        This method can be used to 'propagate' context related effects of settings after import
+        for example. At this moment the only such setting is enabling/disabling analytics.
+     */
+    public static void actOnSettings(Context context) {
+        enableAnalytics(context, mEnableAnalytics);
+    }
+
     public static void loadPrefs(Preferences prefs) {
         SharedPreferences sprefs = prefs.getPreferences();
         DEBUG = sprefs.getBoolean("enableDebugLogging", false);
@@ -735,6 +746,8 @@ public class K9 extends Application {
         } else {
             sNotificationHideSubject = NotificationHideSubject.valueOf(notificationHideSubject);
         }
+
+        mEnableAnalytics = sprefs.getBoolean("analyticsEnabled", true);
 
         String notificationQuickDelete = sprefs.getString("notificationQuickDelete", null);
         if (notificationQuickDelete != null) {
@@ -1205,8 +1218,23 @@ public class K9 extends Application {
         return sNotificationHideSubject;
     }
 
+    public static boolean analyticsEnabled() {
+        return mEnableAnalytics;
+    }
+
     public static void setNotificationHideSubject(final NotificationHideSubject mode) {
         sNotificationHideSubject = mode;
+    }
+
+    private static void enableAnalytics(Context context, boolean enable) {
+        GoogleAnalytics myInstance = GoogleAnalytics.getInstance(context);
+        myInstance.setAppOptOut(!enable);
+        Log.d(LOG_TAG, "Analytics " + (enable ? "activated." : "disabled."));
+    }
+
+    public static void setEnableAnalytics(Context context, boolean enable) {
+        mEnableAnalytics = enable;
+        enableAnalytics(context, enable);
     }
 
     public static NotificationQuickDelete getNotificationQuickDeleteBehaviour() {

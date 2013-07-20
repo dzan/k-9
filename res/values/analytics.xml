@@ -15,18 +15,18 @@
     <bool name="ga_debug">true</bool>
 
     <!--Rename the activities for clarity in the analytics console-->
-    <string name="com.com.fsck.activity.Accounts">Account List</string>
-    <string name="com.com.fsck.activity.FolderList">Folder List</string>
-    <string name="com.com.fsck.activity.MessageCompose">Compose Message</string>
+    <string name="com.fsck.k9.activity.Accounts">Account List</string>
+    <string name="com.fsck.k9.activity.FolderList">Folder List</string>
+    <string name="com.fsck.k9.activity.MessageCompose">Compose Message</string>
     <string name="analytics_screen_messageview">Message View</string>
     <string name="analytics_screen_messagelist">Message List</string>
 
-    <string name="com.com.fsck.activity.setup.AccountSettings">Account Settings</string>
-    <string name="com.com.fsck.activity.setup.FolderSettings">Folder Settings</string>
-    <string name="com.com.fsck.activity.setup.Prefs">Global Settings</string>
-    <string name="com.com.fsck.activity.setup.FontSizeSettings">Font Size Settings</string>
+    <string name="com.fsck.k9.activity.setup.AccountSettings">Account Settings</string>
+    <string name="com.fsck.k9.activity.setup.FolderSettings">Folder Settings</string>
+    <string name="com.fsck.k9.activity.setup.Prefs">Global Settings</string>
+    <string name="com.fsck.k9.activity.setup.FontSizeSettings">Font Size Settings</string>
 
-    <string name="com.com.fsck.activity.ChooseIdentity">Pick Identity</string>
+    <string name="com.fsck.k9.activity.ChooseIdentity">Pick Identity</string>
 
     <!-- ============================================================
                 Analytics Strings

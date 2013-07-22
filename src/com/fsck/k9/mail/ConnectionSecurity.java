@@ -1,5 +1,8 @@
 package com.fsck.k9.mail;
 
+import com.fsck.k9.R;
+import com.fsck.k9.activity.setup.LocalePrintable;
+
 /**
  * The currently available connection security types.
  *
@@ -10,20 +13,21 @@ package com.fsck.k9.mail;
  * {@code ConnectionSecurity} exclusively.
  * </p>
  */
-public enum ConnectionSecurity {
-    NONE(""),
-    STARTTLS_OPTIONAL("tls"),
-    STARTTLS_REQUIRED("tls"),
-    SSL_TLS_OPTIONAL("ssl"),
-    SSL_TLS_REQUIRED("ssl");
+public enum ConnectionSecurity implements LocalePrintable{
+    NONE(R.string.account_setup_incoming_security_none_label),
+    STARTTLS_OPTIONAL(R.string.account_setup_incoming_security_tls_optional_label),
+    STARTTLS_REQUIRED(R.string.account_setup_incoming_security_tls_label),
+    SSL_TLS_OPTIONAL(R.string.account_setup_incoming_security_ssl_optional_label),
+    SSL_TLS_REQUIRED(R.string.account_setup_incoming_security_ssl_label);
 
-    private String schemeName;
+    private int resourceId;
 
-    ConnectionSecurity(String schemeName) {
-        this.schemeName = schemeName;
+    ConnectionSecurity(int resourceId) {
+        this.resourceId = resourceId;
     }
 
-    public String getSchemeName() {
-        return schemeName;
+    @Override
+    public int getResourceId() {
+        return resourceId;
     }
 }

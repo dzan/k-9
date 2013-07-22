@@ -19,7 +19,7 @@ package com.fsck.k9.helper.wizard.model;
 /**
  * Represents a single line item on the final review page.
  *
- * @see com.fsck.k9.helper.wizard.ui.ReviewFragment
+ * @see com.fsck.k9.activity.setup.pages.ReviewFragment
  */
 public class ReviewItem {
     public static final int DEFAULT_WEIGHT = 0;

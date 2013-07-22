@@ -16,6 +16,7 @@
 
 package com.fsck.k9.helper.wizard.model;
 
+import com.fsck.k9.activity.setup.LocalePrintable;
 import com.fsck.k9.helper.wizard.ui.SingleChoiceFragment;
 
 import android.support.v4.app.Fragment;
@@ -31,8 +32,8 @@ import java.util.List;
 public class BranchPage extends SingleFixedChoicePage {
     private List<Branch> mBranches = new ArrayList<Branch>();
 
-    public BranchPage(ModelCallbacks callbacks, String title) {
-        super(callbacks, title);
+    public BranchPage(ModelCallbacks callbacks, String title, String dataKey) {
+        super(callbacks, title, dataKey);
     }
 
     @Override
@@ -55,17 +56,17 @@ public class BranchPage extends SingleFixedChoicePage {
     public void flattenCurrentPageSequence(ArrayList<Page> destination) {
         super.flattenCurrentPageSequence(destination);
         for (Branch branch : mBranches) {
-            if (branch.choice.equals(mData.getString(Page.SIMPLE_DATA_KEY))) {
+            if (branch.choice.name().equals(mData.getString(mDataKey))) {
                 branch.childPageList.flattenCurrentPageSequence(destination);
                 break;
             }
         }
     }
 
-    public BranchPage addBranch(String choice, Page... childPages) {
+    public BranchPage addBranch(LocalePrintable choice, Page... childPages) {
         PageList childPageList = new PageList(childPages);
         for (Page page : childPageList) {
-            page.setParentKey(choice);
+            page.setParentKey(choice.name());
         }
         mBranches.add(new Branch(choice, childPageList));
         return this;
@@ -76,7 +77,7 @@ public class BranchPage extends SingleFixedChoicePage {
         return SingleChoiceFragment.create(getKey());
     }
 
-    public String getOptionAt(int position) {
+    public LocalePrintable getOptionAt(int position) {
         return mBranches.get(position).choice;
     }
 
@@ -86,12 +87,12 @@ public class BranchPage extends SingleFixedChoicePage {
 
     @Override
     public void getReviewItems(ArrayList<ReviewItem> dest) {
-        dest.add(new ReviewItem(getTitle(), mData.getString(SIMPLE_DATA_KEY), getKey()));
+        dest.add(new ReviewItem(getTitle(), mData.getString(mDataKey), getKey()));
     }
 
     @Override
     public boolean isCompleted() {
-        return !TextUtils.isEmpty(mData.getString(SIMPLE_DATA_KEY));
+        return !TextUtils.isEmpty(mData.getString(mDataKey));
     }
 
     @Override
@@ -101,15 +102,15 @@ public class BranchPage extends SingleFixedChoicePage {
     }
 
     public BranchPage setValue(String value) {
-        mData.putString(SIMPLE_DATA_KEY, value);
+        mData.putString(mDataKey, value);
         return this;
     }
 
     private static class Branch {
-        public String choice;
+        public LocalePrintable choice;
         public PageList childPageList;
 
-        private Branch(String choice, PageList childPageList) {
+        private Branch(LocalePrintable choice, PageList childPageList) {
             this.choice = choice;
             this.childPageList = childPageList;
         }

@@ -20,8 +20,6 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -29,50 +27,90 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 import com.fsck.k9.R;
 import com.fsck.k9.activity.setup.AccountSetupModel;
+import com.fsck.k9.activity.setup.autoconfiguration.EmailConfigurationData;
+import com.fsck.k9.activity.setup.autoconfiguration.IspDbTask;
 import com.fsck.k9.helper.wizard.ui.PageFragmentCallbacks;
 
-public class BasicAccountInfoFragment extends Fragment {
+public class AutoConfigurationFragment extends Fragment {
     private static final String ARG_KEY = "key";
 
     private PageFragmentCallbacks mCallbacks;
     private String mKey;
-    private BasicAccountInfoPage mPage;
-    private TextView mEmailView;
-    private TextView mPasswordView;
+    private AutoConfigurationPage mPage;
 
-    public static BasicAccountInfoFragment create(String key) {
+    private TextView mProgressStatusView;
+
+    private IspDbTask mIspDbTask = null;
+    private AccountSetupModel mModel = null;
+
+    public static AutoConfigurationFragment create(String key) {
         Bundle args = new Bundle();
         args.putString(ARG_KEY, key);
 
-        BasicAccountInfoFragment fragment = new BasicAccountInfoFragment();
+        AutoConfigurationFragment fragment = new AutoConfigurationFragment();
         fragment.setArguments(args);
         return fragment;
     }
 
-    public BasicAccountInfoFragment() {
+    public AutoConfigurationFragment() {
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // get our arguments out
         Bundle args = getArguments();
         mKey = args.getString(ARG_KEY);
-        mPage = (BasicAccountInfoPage) mCallbacks.onGetPage(mKey);
+        mPage = (AutoConfigurationPage) mCallbacks.onGetPage(mKey);
+        mModel = mCallbacks.onGetModel();
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
-        View rootView = inflater.inflate(R.layout.wizard_frag_basicaccountinfo, container, false);
+        View rootView = inflater.inflate(R.layout.wizard_frag_autoconfiguration, container, false);
         ((TextView) rootView.findViewById(android.R.id.title)).setText(mPage.getTitle());
 
-        mEmailView = ((TextView) rootView.findViewById(R.id.email));
-        mEmailView.setText(mPage.getData().getString(AccountSetupModel.INCOMING_USERNAME_KEY));
-
-        mPasswordView = ((TextView) rootView.findViewById(R.id.password));
-        mPasswordView.setText(mPage.getData().getString(AccountSetupModel.INCOMING_PASSWORD_KEY));
+        mProgressStatusView = ((TextView) rootView.findViewById(R.id.progress_status));
         return rootView;
+    }
+
+    /*
+        Currently there is no proper "page got paged" callback so this
+        is the best solution.
+
+        TODO: check if this works for older api's otherwise switch to setMenuVisibility()
+     */
+    @Override
+    public void setUserVisibleHint(boolean isVisibleToUser) {
+        super.setUserVisibleHint(isVisibleToUser);
+
+        if (isVisibleToUser) {
+            // create task
+            mIspDbTask = new IspDbTask() {
+                @Override
+                protected void onProgressUpdate(String... progress) {
+                    mProgressStatusView.setText(progress[0]);
+                }
+
+                @Override
+                protected void onPostExecute(EmailConfigurationData emailConfigurationData) {
+                    mPage.getData().putParcelable(AccountSetupModel.CONFIGURATION_KEY, emailConfigurationData);
+                    mPage.getData().putBoolean(AutoConfigurationPage.FINISHED_KEY, true);
+                    mPage.notifyDataChanged();
+                }
+            };
+
+            // execute task
+            mIspDbTask.execute(mModel.getConfigurationData().incomingServer.get(0).username);
+        }
+        else {
+            if (mIspDbTask != null) {
+                mIspDbTask.cancel(true);
+            }
+        }
+
     }
 
     @Override
@@ -93,53 +131,12 @@ public class BasicAccountInfoFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(View view, Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-
-        mEmailView.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence charSequence, int i, int i1,
-                                          int i2) {
-            }
-
-            @Override
-            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-            }
-
-            @Override
-            public void afterTextChanged(Editable editable) {
-                mPage.getData().putString(AccountSetupModel.INCOMING_USERNAME_KEY,
-                        (editable != null) ? editable.toString() : null);
-                mPage.notifyDataChanged();
-            }
-        });
-
-        mPasswordView.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence charSequence, int i, int i1,
-                                          int i2) {
-            }
-
-            @Override
-            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-            }
-
-            @Override
-            public void afterTextChanged(Editable editable) {
-                mPage.getData().putString(AccountSetupModel.INCOMING_PASSWORD_KEY,
-                        (editable != null) ? editable.toString() : null);
-                mPage.notifyDataChanged();
-            }
-        });
-    }
-
-    @Override
     public void setMenuVisibility(boolean menuVisible) {
         super.setMenuVisibility(menuVisible);
 
         // In a future update to the support library, this should override setUserVisibleHint
         // instead of setMenuVisibility.
-        if (mEmailView != null) {
+        if (mProgressStatusView != null) {
             InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(
                     Context.INPUT_METHOD_SERVICE);
             if (!menuVisible) {

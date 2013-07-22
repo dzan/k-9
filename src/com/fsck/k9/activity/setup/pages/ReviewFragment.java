@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
-package com.fsck.k9.helper.wizard.ui;
+package com.fsck.k9.activity.setup.pages;
 
+import android.util.Pair;
 import com.fsck.k9.R;
+import com.fsck.k9.activity.setup.AccountSetupModel;
+import com.fsck.k9.activity.setup.autoconfiguration.CheckConnectionTask;
 import com.fsck.k9.helper.wizard.model.AbstractWizardModel;
 import com.fsck.k9.helper.wizard.model.ModelCallbacks;
 import com.fsck.k9.helper.wizard.model.Page;
@@ -32,6 +35,7 @@ import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
+import com.fsck.k9.helper.wizard.ui.PageFragmentCallbacks;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,10 +44,13 @@ import java.util.List;
 
 public class ReviewFragment extends ListFragment implements ModelCallbacks {
     private Callbacks mCallbacks;
-    private AbstractWizardModel mWizardModel;
+    private AccountSetupModel mWizardModel;
     private List<ReviewItem> mCurrentReviewItems;
 
+    private TextView mStatusView;
+
     private ReviewAdapter mReviewAdapter;
+    private CheckConnectionTask mCheckConnectionTask;
 
     public ReviewFragment() {
     }
@@ -57,11 +64,13 @@ public class ReviewFragment extends ListFragment implements ModelCallbacks {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
-        View rootView = inflater.inflate(R.layout.fragment_page, container, false);
+        View rootView = inflater.inflate(R.layout.wizard_review_page, container, false);
 
         TextView titleView = (TextView) rootView.findViewById(android.R.id.title);
         titleView.setText(R.string.review);
         titleView.setTextColor(getResources().getColor(R.color.review_green));
+
+        mStatusView = (TextView) rootView.findViewById(R.id.wizard_review_status);
 
         ListView listView = (ListView) rootView.findViewById(android.R.id.list);
         setListAdapter(mReviewAdapter);
@@ -84,6 +93,45 @@ public class ReviewFragment extends ListFragment implements ModelCallbacks {
         onPageTreeChanged();
     }
 
+    /*
+        Currently there is no proper "page got paged" callback so this
+        is the best solution.
+
+        TODO: check if this works for older api's otherwise switch to setMenuVisibility()
+    */
+    @Override
+    public void setUserVisibleHint(boolean isVisibleToUser) {
+        super.setUserVisibleHint(isVisibleToUser);
+
+        if (isVisibleToUser) {
+            // create task
+            mCheckConnectionTask = new CheckConnectionTask(getActivity(), true, true) {
+                @Override
+                protected void onProgressUpdate(String... progress) {
+                    mStatusView.setText(progress[0]);
+                }
+
+                @Override
+                protected void onPostExecute(Pair<Status, Status> status) {
+                    if (status.first == Status.SUCCESS &&
+                            status.second == Status.SUCCESS) {
+                        mStatusView.setText("Settings check out, please review to verify and create your account.");
+                    } else {
+                        // todo be smart
+                    }
+                }
+            };
+
+            // execute task
+            mCheckConnectionTask.execute(mWizardModel.getConfigurationData());
+        }
+        else {
+            if (mCheckConnectionTask != null) {
+                mCheckConnectionTask.cancel(true);
+            }
+        }
+
+    }
     @Override
     public void onPageTreeChanged() {
         onPageDataChanged(null);
@@ -121,8 +169,7 @@ public class ReviewFragment extends ListFragment implements ModelCallbacks {
         mCallbacks.onEditScreenAfterReview(mCurrentReviewItems.get(position).getPageKey());
     }
 
-    public interface Callbacks {
-        AbstractWizardModel onGetModel();
+    public interface Callbacks extends PageFragmentCallbacks{
         void onEditScreenAfterReview(String pageKey);
     }
 

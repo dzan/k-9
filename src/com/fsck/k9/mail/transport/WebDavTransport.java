@@ -38,6 +38,17 @@ public class WebDavTransport extends Transport {
 
     private WebDavStore store;
 
+    public WebDavTransport(ServerSettings settings) throws MessagingException {
+        if (Store.getRemoteInstance(settings) instanceof WebDavStore) {
+            store = (WebDavStore) Store.getRemoteInstance(settings);
+        } else {
+            store = new WebDavStore(settings);
+        }
+
+        if (K9.DEBUG)
+            Log.d(K9.LOG_TAG, ">>> New WebDavTransport creation complete");
+    }
+
     public WebDavTransport(Account account) throws MessagingException {
         if (account.getRemoteStore() instanceof WebDavStore) {
             store = (WebDavStore) account.getRemoteStore();

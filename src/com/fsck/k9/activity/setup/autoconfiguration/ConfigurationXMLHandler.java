@@ -95,6 +95,26 @@ public class ConfigurationXMLHandler extends DefaultHandler {
         }
     }
 
+    public static String convertUsername(String xmlValue, String address) {
+        String[] emailParts = address.split("@");
+        String result = null;
+
+        if (xmlValue.equals("%EMAILADDRESS%")) {
+            result = address;
+        } else if (xmlValue.equals("%EMAILLOCALPART%")) {
+            result = emailParts[0];
+        } else if (xmlValue.equals("%EMAILDOMAIN%")) {
+            result = emailParts[1];
+        } else if (xmlValue.equals("%REALNAME%")) {
+            throw new UnsupportedOperationException(
+                    "Mozilla autoconfiguration xml parser does not support %REALNAME% yet.");
+        } else {
+            throw new UnsupportedOperationException(
+                    "Mozilla autoconfiguration xml parser does not support input fields for usernames yet.");
+        }
+
+        return (result == null) ? "" : result;
+    }
     private enum Attribute {
         // main structure attributes
         ID, TYPE,

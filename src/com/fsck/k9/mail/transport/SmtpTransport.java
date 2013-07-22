@@ -180,6 +180,17 @@ public class SmtpTransport extends Transport {
     private boolean m8bitEncodingAllowed;
     private int mLargestAcceptableMessage;
 
+    public SmtpTransport(ServerSettings settings) throws MessagingException {
+        mHost = settings.host;
+        mPort = settings.port;
+
+        mConnectionSecurity = settings.connectionSecurity;
+
+        mAuthType = settings.authenticationType;
+        mUsername = settings.username;
+        mPassword = settings.password;
+    }
+
     public SmtpTransport(Account account) throws MessagingException {
         ServerSettings settings;
         try {

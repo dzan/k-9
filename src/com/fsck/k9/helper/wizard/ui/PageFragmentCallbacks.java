@@ -16,8 +16,10 @@
 
 package com.fsck.k9.helper.wizard.ui;
 
+import com.fsck.k9.activity.setup.AccountSetupModel;
 import com.fsck.k9.helper.wizard.model.Page;
 
 public interface PageFragmentCallbacks {
     Page onGetPage(String key);
+    AccountSetupModel onGetModel();
 }

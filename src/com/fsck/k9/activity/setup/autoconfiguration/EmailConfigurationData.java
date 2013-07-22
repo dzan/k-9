@@ -28,6 +28,7 @@ public class EmailConfigurationData implements Parcelable {
     public List<String> domains;
     public String displayName;
     public String displayShortName;
+    public String email;
 
     // Possible servers for this ISP
     public List<ParcelableServerSettings> incomingServer;
@@ -37,6 +38,10 @@ public class EmailConfigurationData implements Parcelable {
     public String identity;
     public List<InputField> inputFields;
     public List<DocumentationBlock> documentation;
+
+    // Keep track of which servers were tried
+    private int activeIncoming = 0;
+    private int activeOutgoing = 0;
 
     /*
         Constructors
@@ -58,6 +63,7 @@ public class EmailConfigurationData implements Parcelable {
         domains = parcel.readArrayList(String.class.getClassLoader());
         displayName = parcel.readString();
         displayShortName = parcel.readString();
+        email = parcel.readString();
 
         incomingServer = parcel.readArrayList(ParcelableServerSettings.class.getClassLoader());
         outgoingServer = parcel.readArrayList(ParcelableServerSettings.class.getClassLoader());
@@ -65,8 +71,32 @@ public class EmailConfigurationData implements Parcelable {
         identity = parcel.readString();
         inputFields = parcel.readArrayList(InputField.class.getClassLoader());
         documentation = parcel.readArrayList(DocumentationBlock.class.getClassLoader());
+
+        activeIncoming = parcel.readInt();
+        activeOutgoing = parcel.readInt();
     }
 
+    public ParcelableServerSettings getActiveIncoming() {
+        if (incomingServer.isEmpty()) {
+            incomingServer.add(new ParcelableServerSettings(ServerType.UNSET));
+        }
+        return incomingServer.get(activeIncoming);
+    }
+
+    public ParcelableServerSettings getActiveOutgoing() {
+        if (outgoingServer.isEmpty()) {
+            outgoingServer.add(new ParcelableServerSettings(ServerType.UNSET));
+        }
+        return outgoingServer.get(activeOutgoing);
+    }
+
+    public void setActiveIncoming(int activeIncoming) {
+        this.activeIncoming = activeIncoming;
+    }
+
+    public void setActiveOutgoing(int activeOutgoing) {
+        this.activeOutgoing = activeOutgoing;
+    }
     /*******************************************************************************
      Parcelable
      *******************************************************************************/
@@ -100,6 +130,7 @@ public class EmailConfigurationData implements Parcelable {
         parcel.writeList(domains);
         parcel.writeString(displayName);
         parcel.writeString(displayShortName);
+        parcel.writeString(email);
 
         parcel.writeList(incomingServer);
         parcel.writeList(outgoingServer);
@@ -107,6 +138,9 @@ public class EmailConfigurationData implements Parcelable {
         parcel.writeString(identity);
         parcel.writeList(inputFields);
         parcel.writeList(documentation);
+
+        parcel.writeInt(activeIncoming);
+        parcel.writeInt(activeOutgoing);
     }
 
     /*******************************************************************************

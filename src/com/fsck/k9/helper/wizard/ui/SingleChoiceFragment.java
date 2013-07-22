@@ -17,6 +17,7 @@
 package com.fsck.k9.helper.wizard.ui;
 
 import com.fsck.k9.R;
+import com.fsck.k9.activity.setup.LocalePrintable;
 import com.fsck.k9.helper.wizard.model.Page;
 import com.fsck.k9.helper.wizard.model.SingleFixedChoicePage;
 
@@ -38,7 +39,8 @@ public class SingleChoiceFragment extends ListFragment {
     private static final String ARG_KEY = "key";
 
     private PageFragmentCallbacks mCallbacks;
-    private List<String> mChoices;
+    private List<String> mChoicesStrings;
+    private List<LocalePrintable> mChoices;
     private String mKey;
     private Page mPage;
 
@@ -63,9 +65,17 @@ public class SingleChoiceFragment extends ListFragment {
         mPage = mCallbacks.onGetPage(mKey);
 
         SingleFixedChoicePage fixedChoicePage = (SingleFixedChoicePage) mPage;
-        mChoices = new ArrayList<String>();
+        mChoicesStrings = new ArrayList<String>();
+        mChoices = new ArrayList<LocalePrintable>();
+        int resId;
         for (int i = 0; i < fixedChoicePage.getOptionCount(); i++) {
             mChoices.add(fixedChoicePage.getOptionAt(i));
+            resId = mChoices.get(i).getResourceId();
+            if (resId != LocalePrintable.NO_RESOURCE_ID) {
+                mChoicesStrings.add(getString(resId));
+            } else {
+                mChoicesStrings.add(mChoices.get(i).name());
+            }
         }
     }
 
@@ -77,18 +87,18 @@ public class SingleChoiceFragment extends ListFragment {
 
         final ListView listView = (ListView) rootView.findViewById(android.R.id.list);
         setListAdapter(new ArrayAdapter<String>(getActivity(),
-                android.R.layout.simple_list_item_single_choice,
+                R.layout.wizard_choice_list_item,
                 android.R.id.text1,
-                mChoices));
+                mChoicesStrings));
         listView.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
 
         // Pre-select currently selected item.
         new Handler().post(new Runnable() {
             @Override
             public void run() {
-                String selection = mPage.getData().getString(Page.SIMPLE_DATA_KEY);
+                String selection = mPage.getData().getString(mPage.getDataKey());
                 for (int i = 0; i < mChoices.size(); i++) {
-                    if (mChoices.get(i).equals(selection)) {
+                    if (mChoices.get(i).name().equals(selection)) {
                         listView.setItemChecked(i, true);
                         break;
                     }
@@ -118,8 +128,8 @@ public class SingleChoiceFragment extends ListFragment {
 
     @Override
     public void onListItemClick(ListView l, View v, int position, long id) {
-        mPage.getData().putString(Page.SIMPLE_DATA_KEY,
-                getListAdapter().getItem(position).toString());
+        mPage.getData().putString(mPage.getDataKey(),
+                mChoices.get(position).name());
         mPage.notifyDataChanged();
     }
 }

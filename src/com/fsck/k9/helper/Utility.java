@@ -715,4 +715,17 @@ public class Utility {
 
         return newArray;
     }
+
+    public static String extractTopLevelDomain(final String url) {
+        String[] atoms = url.toLowerCase().split("\\.");
+        String tld = "";
+        int pos = atoms.length-1;
+
+        do {
+            tld = atoms[pos] + (tld.isEmpty() ? "" : ".") + tld;
+            --pos;
+        } while (tld.matches(Regex.TOP_LEVEL_DOMAIN_STR) && pos >= 0);
+
+        return tld.isEmpty() ? null : tld;
+    }
 }

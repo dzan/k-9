@@ -16,6 +16,8 @@
 
 package com.fsck.k9.helper.wizard.model;
 
+import android.content.Context;
+import com.fsck.k9.activity.setup.LocalePrintable;
 import com.fsck.k9.helper.wizard.ui.SingleChoiceFragment;
 
 import android.support.v4.app.Fragment;
@@ -28,10 +30,10 @@ import java.util.Arrays;
  * A page offering the user a number of mutually exclusive choices.
  */
 public class SingleFixedChoicePage extends Page {
-    protected ArrayList<String> mChoices = new ArrayList<String>();
+    protected ArrayList<LocalePrintable> mChoices = new ArrayList<LocalePrintable>();
 
-    public SingleFixedChoicePage(ModelCallbacks callbacks, String title) {
-        super(callbacks, title);
+    public SingleFixedChoicePage(ModelCallbacks callbacks, String title, String dataKey) {
+        super(callbacks, title, dataKey);
     }
 
     @Override
@@ -39,7 +41,7 @@ public class SingleFixedChoicePage extends Page {
         return SingleChoiceFragment.create(getKey());
     }
 
-    public String getOptionAt(int position) {
+    public LocalePrintable getOptionAt(int position) {
         return mChoices.get(position);
     }
 
@@ -49,21 +51,21 @@ public class SingleFixedChoicePage extends Page {
 
     @Override
     public void getReviewItems(ArrayList<ReviewItem> dest) {
-        dest.add(new ReviewItem(getTitle(), mData.getString(SIMPLE_DATA_KEY), getKey()));
+        dest.add(new ReviewItem(getTitle(), mData.getString(mDataKey), getKey()));
     }
 
     @Override
     public boolean isCompleted() {
-        return !TextUtils.isEmpty(mData.getString(SIMPLE_DATA_KEY));
+        return !TextUtils.isEmpty(mData.getString(mDataKey));
     }
 
-    public SingleFixedChoicePage setChoices(String... choices) {
+    public SingleFixedChoicePage setChoices(LocalePrintable... choices) {
         mChoices.addAll(Arrays.asList(choices));
         return this;
     }
 
     public SingleFixedChoicePage setValue(String value) {
-        mData.putString(SIMPLE_DATA_KEY, value);
+        mData.putString(mDataKey, value);
         return this;
     }
 }

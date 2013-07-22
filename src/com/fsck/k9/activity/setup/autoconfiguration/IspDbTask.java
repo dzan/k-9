@@ -4,6 +4,7 @@ import android.os.AsyncTask;
 import android.util.Log;
 import com.fsck.k9.K9;
 import com.fsck.k9.helper.Utility;
+import com.fsck.k9.mail.ServerSettings;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
@@ -160,6 +161,18 @@ public class IspDbTask extends AsyncTask<String, String, EmailConfigurationData>
 
             // try next domain
             ++domainIndex;
+        }
+
+        // convert username field
+        ServerSettings settings;
+        for (int i=0; i < result.incomingServer.size(); ++i) {
+            settings = result.incomingServer.get(i);
+            settings.username = ConfigurationXMLHandler.convertUsername(settings.username, params[0]);
+        }
+
+        for (int i=0; i < result.outgoingServer.size(); ++i) {
+            settings = result.outgoingServer.get(i);
+            settings.username = ConfigurationXMLHandler.convertUsername(settings.username, params[0]);
         }
 
         return result;

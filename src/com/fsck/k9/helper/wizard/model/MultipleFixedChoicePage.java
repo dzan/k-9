@@ -26,8 +26,8 @@ import java.util.ArrayList;
  * A page offering the user a number of non-mutually exclusive choices.
  */
 public class MultipleFixedChoicePage extends SingleFixedChoicePage {
-    public MultipleFixedChoicePage(ModelCallbacks callbacks, String title) {
-        super(callbacks, title);
+    public MultipleFixedChoicePage(ModelCallbacks callbacks, String title, String dataKey) {
+        super(callbacks, title, dataKey);
     }
 
     @Override
@@ -39,7 +39,7 @@ public class MultipleFixedChoicePage extends SingleFixedChoicePage {
     public void getReviewItems(ArrayList<ReviewItem> dest) {
         StringBuilder sb = new StringBuilder();
 
-        ArrayList<String> selections = mData.getStringArrayList(Page.SIMPLE_DATA_KEY);
+        ArrayList<String> selections = mData.getStringArrayList(mDataKey);
         if (selections != null && selections.size() > 0) {
             for (String selection : selections) {
                 if (sb.length() > 0) {
@@ -54,7 +54,7 @@ public class MultipleFixedChoicePage extends SingleFixedChoicePage {
 
     @Override
     public boolean isCompleted() {
-        ArrayList<String> selections = mData.getStringArrayList(Page.SIMPLE_DATA_KEY);
+        ArrayList<String> selections = mData.getStringArrayList(mDataKey);
         return selections != null && selections.size() > 0;
     }
 }

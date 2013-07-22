@@ -25,10 +25,6 @@ import java.util.ArrayList;
  * Represents a single page in the wizard.
  */
 public abstract class Page implements PageTreeNode {
-    /**
-     * The key into {@link #getData()} used for wizards with simple (single) values.
-     */
-    public static final String SIMPLE_DATA_KEY = "_";
 
     protected ModelCallbacks mCallbacks;
 
@@ -39,10 +35,16 @@ public abstract class Page implements PageTreeNode {
     protected String mTitle;
     protected boolean mRequired = false;
     protected String mParentKey;
+    protected String mDataKey;
 
-    protected Page(ModelCallbacks callbacks, String title) {
+    protected Page(ModelCallbacks callbacks, String title, String dataKey) {
         mCallbacks = callbacks;
         mTitle = title;
+        mDataKey = dataKey;
+    }
+
+    protected Page(ModelCallbacks callbacks, String title) {
+        this(callbacks, title, null);
     }
 
     public Bundle getData() {
@@ -83,6 +85,10 @@ public abstract class Page implements PageTreeNode {
         return true;
     }
 
+    public String getDataKey() {
+        return mDataKey;
+    }
+
     public void resetData(Bundle data) {
         mData = data;
         notifyDataChanged();
@@ -96,4 +102,6 @@ public abstract class Page implements PageTreeNode {
         mRequired = required;
         return this;
     }
+
+
 }

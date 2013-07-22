@@ -17,6 +17,7 @@
 package com.fsck.k9.helper.wizard.ui;
 
 import com.fsck.k9.R;
+import com.fsck.k9.activity.setup.LocalePrintable;
 import com.fsck.k9.helper.wizard.model.MultipleFixedChoicePage;
 import com.fsck.k9.helper.wizard.model.Page;
 
@@ -42,7 +43,8 @@ public class MultipleChoiceFragment extends ListFragment {
 
     private PageFragmentCallbacks mCallbacks;
     private String mKey;
-    private List<String> mChoices;
+    private List<LocalePrintable> mChoices;
+    private List<String> mChoicesStrings;
     private Page mPage;
 
     public static MultipleChoiceFragment create(String key) {
@@ -66,9 +68,17 @@ public class MultipleChoiceFragment extends ListFragment {
         mPage = mCallbacks.onGetPage(mKey);
 
         MultipleFixedChoicePage fixedChoicePage = (MultipleFixedChoicePage) mPage;
-        mChoices = new ArrayList<String>();
+        mChoicesStrings = new ArrayList<String>();
+        mChoices = new ArrayList<LocalePrintable>();
+        int resId;
         for (int i = 0; i < fixedChoicePage.getOptionCount(); i++) {
             mChoices.add(fixedChoicePage.getOptionAt(i));
+            resId = mChoices.get(i).getResourceId();
+            if (resId != LocalePrintable.NO_RESOURCE_ID) {
+                mChoicesStrings.add(getString(resId));
+            } else {
+                mChoicesStrings.add(mChoices.get(i).name());
+            }
         }
     }
 
@@ -82,7 +92,7 @@ public class MultipleChoiceFragment extends ListFragment {
         setListAdapter(new ArrayAdapter<String>(getActivity(),
                 android.R.layout.simple_list_item_multiple_choice,
                 android.R.id.text1,
-                mChoices));
+                mChoicesStrings));
         listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
 
         // Pre-select currently selected items.
@@ -90,7 +100,7 @@ public class MultipleChoiceFragment extends ListFragment {
             @Override
             public void run() {
                 ArrayList<String> selectedItems = mPage.getData().getStringArrayList(
-                        Page.SIMPLE_DATA_KEY);
+                        mPage.getDataKey());
                 if (selectedItems == null || selectedItems.size() == 0) {
                     return;
                 }
@@ -98,7 +108,7 @@ public class MultipleChoiceFragment extends ListFragment {
                 Set<String> selectedSet = new HashSet<String>(selectedItems);
 
                 for (int i = 0; i < mChoices.size(); i++) {
-                    if (selectedSet.contains(mChoices.get(i))) {
+                    if (selectedSet.contains(mChoices.get(i).name())) {
                         listView.setItemChecked(i, true);
                     }
                 }
@@ -131,11 +141,11 @@ public class MultipleChoiceFragment extends ListFragment {
         ArrayList<String> selections = new ArrayList<String>();
         for (int i = 0; i < checkedPositions.size(); i++) {
             if (checkedPositions.valueAt(i)) {
-                selections.add(getListAdapter().getItem(checkedPositions.keyAt(i)).toString());
+                selections.add(mChoices.get(i).name());
             }
         }
 
-        mPage.getData().putStringArrayList(Page.SIMPLE_DATA_KEY, selections);
+        mPage.getData().putStringArrayList(mPage.getDataKey(), selections);
         mPage.notifyDataChanged();
     }
 }

@@ -5,3 +5,4 @@
 *	Remove the store constructors taking Account objects for arguments.
 *	Remove further references to Account from Stores and Transports.
 *	More specific exception checking and reporting in CheckConnectionTask
+*	Remove old setup code

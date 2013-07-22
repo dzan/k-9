@@ -11,6 +11,17 @@ public abstract class Transport {
     // RFC 1047
     protected static final int SOCKET_READ_TIMEOUT = 300000;
 
+    public synchronized static Transport getInstance(ServerSettings settings) throws MessagingException {
+        switch (settings.type) {
+            case SMTP:
+                return new SmtpTransport(settings);
+            case WEBDAV:
+                return new WebDavTransport(settings);
+            default:
+                throw new MessagingException("Unable to locate an applicable Transport for " + settings.type.toString());
+        }
+    }
+
     public synchronized static Transport getInstance(Account account) throws MessagingException {
         String uri = account.getTransportUri();
         if (uri.startsWith("smtp")) {
@@ -56,12 +67,13 @@ public abstract class Transport {
      * @see WebDavTransport#createUri(ServerSettings)
      */
     public static String createTransportUri(ServerSettings server) {
-        if (SmtpTransport.TRANSPORT_TYPE.equals(server.type)) {
-            return SmtpTransport.createUri(server);
-        } else if (WebDavTransport.TRANSPORT_TYPE.equals(server.type)) {
-            return WebDavTransport.createUri(server);
-        } else {
-            throw new IllegalArgumentException("Not a valid transport URI");
+        switch (server.type) {
+            case SMTP:
+                return SmtpTransport.createUri(server);
+            case WEBDAV:
+                return WebDavTransport.createUri(server);
+            default:
+                throw new IllegalArgumentException("Not a valid transport URI");
         }
     }
 

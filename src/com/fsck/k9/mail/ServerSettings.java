@@ -191,4 +191,11 @@ public class ServerSettings {
         this.password = newPassword;
         return this;
     }
+
+    /**
+     * Used in Store / Account to identify different store instances.
+     */
+    public String getHash() {
+        return (host+username+password+port);
+    }
 }

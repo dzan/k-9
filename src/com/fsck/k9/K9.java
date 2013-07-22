@@ -124,7 +124,7 @@ public class K9 extends Application {
      * Log.d, including protocol dumps.
      * Controlled by Preferences at run-time
      */
-    public static boolean DEBUG = false;
+    public static boolean DEBUG = true;
 
     /**
      * Should K-9 log the conversation it has over the wire with
@@ -155,13 +155,16 @@ public class K9 extends Application {
 
     public static boolean DEBUG_PROTOCOL_WEBDAV = true;
 
-
+    /**
+     * Should K-9 log the autoconfiguration process?
+     */
+    public static boolean DEBUG_SETUP = true;
 
     /**
      * If this is enabled than logging that normally hides sensitive information
      * like passwords will show that information.
      */
-    public static boolean DEBUG_SENSITIVE = false;
+    public static boolean DEBUG_SENSITIVE = true;
 
     /**
      * Can create messages containing stack traces that can be forwarded

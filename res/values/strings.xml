@@ -379,8 +379,6 @@ Please submit bug reports, contribute new features and ask questions at
     <string name="account_setup_check_settings_canceling_msg">Canceling\u2026</string>
 
     <string name="account_setup_names_title">You\'re almost done!</string>
-    <string name="account_setup_names_account_name_label">Give this account a name (optional):</string>
-    <string name="account_setup_names_user_name_label">Type your name (displays on outgoing messages):</string>
 
     <string name="account_setup_account_type_title">Account type</string>
     <string name="account_setup_account_type_instructions">What kind of account is this?</string>
@@ -1153,15 +1151,30 @@ Please submit bug reports, contribute new features and ask questions at
 
     <string name="mark_all_as_read">Mark all as read</string>
 
-    <!-- WizardPager -->
+    <!--
+        WizardPager
+    -->
     <string name="wizard_title">Add new account</string>
+
+    <!-- Fragment titles -->
+    <string name="wizard_which_account_title">Which account</string>
+    <string name="account_setup_account_type_title">Account type</string>
+
+    <!-- Labels -->
+    <string name="wizard_email_label">Email</string>
+    <string name="wizard_password_label">Password</string>
+    <string name="account_setup_names_account_name_label">Give this account a name (optional):</string>
+    <string name="account_setup_names_user_name_label">Type your name (displays on outgoing messages):</string>
+
+    <!-- Hints -->
+    <string name="wizard_email_hint">john.doe@mail.com</string>
+    <string name="wizard_password_hint">password</string>
+
+    <!-- Options -->
+    <string name="wizard_which_account_other">Other</string>
+    <string name="wizard_which_account_manual">Manual</string>
+
+    <!-- Other -->
     <string name="review">Review</string>
     <string name="finish">Create Account</string>
-    <string name="wizard_which_account_title">Which account</string>
-    <string name="wizard_which_account_other">Other</string>
-
-    <string name="wizard_email_label">Email</string>
-    <string name="wizard_email_hint">john.doe@mail.com</string>
-    <string name="wizard_password_label">Password</string>
-    <string name="wizard_password_hint">password</string>
 </resources>

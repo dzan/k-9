@@ -12,26 +12,24 @@
             android:orientation="vertical">
 
             <TextView style="@style/WizardFormLabel"
-                android:text="@string/wizard_email_label" />
+                android:id="@+id/wizard_label_field1" />
 
-            <EditText android:id="@+id/email"
+            <EditText android:id="@+id/wizard_field1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:saveEnabled="false"
-                android:inputType="textEmailAddress"
-                android:hint="@string/wizard_email_hint"
+                android:inputType="text"
                 android:layout_marginBottom="16dp" />
 
             <TextView style="@style/WizardFormLabel"
-                android:text="@string/wizard_password_label" />
+                      android:id="@+id/wizard_label_field2" />
 
-            <EditText android:id="@+id/password"
+            <EditText android:id="@+id/wizard_field2"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:saveEnabled="false"
                 android:password="true"
-                android:inputType="textPassword"
-                android:hint="@string/wizard_password_hint" />
+                android:inputType="text" />
 
         </LinearLayout>
     </ScrollView>

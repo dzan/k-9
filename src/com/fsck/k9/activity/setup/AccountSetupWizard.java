@@ -2,13 +2,17 @@ package com.fsck.k9.activity.setup;
 
 import android.content.Context;
 import android.content.Intent;
+import com.fsck.k9.Account;
+import com.fsck.k9.Preferences;
 import com.fsck.k9.R;
+import com.fsck.k9.activity.Accounts;
 import com.fsck.k9.activity.K9FragmentActivity;
+import com.fsck.k9.activity.setup.autoconfiguration.EmailConfigurationData;
 import com.fsck.k9.helper.wizard.model.AbstractWizardModel;
 import com.fsck.k9.helper.wizard.model.ModelCallbacks;
 import com.fsck.k9.helper.wizard.model.Page;
 import com.fsck.k9.helper.wizard.ui.PageFragmentCallbacks;
-import com.fsck.k9.helper.wizard.ui.ReviewFragment;
+import com.fsck.k9.activity.setup.pages.ReviewFragment;
 import com.fsck.k9.helper.wizard.ui.StepPagerStrip;
 
 import android.os.Bundle;
@@ -20,6 +24,8 @@ import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import com.fsck.k9.mail.Store;
+import com.fsck.k9.mail.Transport;
 
 import java.util.List;
 
@@ -38,7 +44,7 @@ public class AccountSetupWizard extends K9FragmentActivity implements
 
     private boolean mEditingAfterReview;
 
-    private AbstractWizardModel mWizardModel;
+    private AccountSetupModel mWizardModel;
 
     private boolean mConsumePageSelectedEvent;
 
@@ -52,7 +58,7 @@ public class AccountSetupWizard extends K9FragmentActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.account_setup_wizard);
 
-        mWizardModel = new AccountSetupModel(this);
+        mWizardModel = AccountSetupModel.getInstance(this);
 
         if (savedInstanceState != null) {
             mWizardModel.load(savedInstanceState.getBundle("model"));
@@ -96,7 +102,12 @@ public class AccountSetupWizard extends K9FragmentActivity implements
             @Override
             public void onClick(View view) {
                 if (mPager.getCurrentItem() == mCurrentPageSequence.size()) {
-                    // TODO create account
+                    // create a new account
+                    Account account = createNewAccount(mWizardModel);
+
+                    // launch accounts activity
+                    Accounts.listAccounts(AccountSetupWizard.this);
+                    finish();
                 } else {
                     if (mEditingAfterReview) {
                         mPager.setCurrentItem(mPagerAdapter.getCount() - 1);
@@ -116,6 +127,47 @@ public class AccountSetupWizard extends K9FragmentActivity implements
 
         onPageTreeChanged();
         updateBottomBar();
+    }
+
+    private Account createNewAccount(AccountSetupModel model) {
+        Account account = Preferences.getPreferences(this).newAccount();
+        EmailConfigurationData settings = model.getConfigurationData();
+
+        account.setName(settings.displayName);
+        account.setEmail(settings.email);
+
+        account.setStoreUri(Store.createStoreUri(settings.getActiveIncoming()));
+        account.setTransportUri(Transport.createTransportUri(settings.getActiveOutgoing()));
+
+        /*
+            set folder names
+         */
+        account.setDraftsFolderName(getString(R.string.special_mailbox_name_drafts));
+        account.setTrashFolderName(getString(R.string.special_mailbox_name_trash));
+        account.setArchiveFolderName(getString(R.string.special_mailbox_name_archive));
+        // Yahoo! has a special folder for Spam, called "Bulk Mail".
+        if (settings.getActiveIncoming().host.toLowerCase().endsWith(".yahoo.com")) {
+            account.setSpamFolderName("Bulk Mail");
+        } else {
+            account.setSpamFolderName(getString(R.string.special_mailbox_name_spam));
+        }
+        account.setSentFolderName(getString(R.string.special_mailbox_name_sent));
+
+        /*
+            set some account settings depending on server settings
+         */
+        switch (settings.getActiveIncoming().type) {
+            case IMAP:
+                account.setDeletePolicy(Account.DELETE_POLICY_ON_DELETE);
+                break;
+            case POP3:
+                account.setDeletePolicy(Account.DELETE_POLICY_NEVER);
+                break;
+            default:
+        }
+
+        account.save(Preferences.getPreferences(this));
+        return account;
     }
 
     @Override
@@ -160,7 +212,7 @@ public class AccountSetupWizard extends K9FragmentActivity implements
     }
 
     @Override
-    public AbstractWizardModel onGetModel() {
+    public AccountSetupModel onGetModel() {
         return mWizardModel;
     }
 

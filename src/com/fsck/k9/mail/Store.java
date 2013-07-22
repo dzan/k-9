@@ -73,7 +73,9 @@ public abstract class Store {
                 store = null;
         }
 
-        sStores.put(serverData.getHash(), store);
+        // todo fix this
+        // don't save these stores for now, without an account object the folders will not be set up
+        //sStores.put(serverData.getHash(), store);
         return store;
     }
 
